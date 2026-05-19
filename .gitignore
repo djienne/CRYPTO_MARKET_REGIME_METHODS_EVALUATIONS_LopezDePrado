@@ -1,0 +1,13 @@
+# Copyrighted reference source: do not commit.
+Marcos Lopez de Prado - Advances in Financial Machine Learning (2018, Wiley) - libgen.li.pdf
+
+# LaTeX build byproducts.
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+
+# Python cache.
+__pycache__/
+*.py[cod]
