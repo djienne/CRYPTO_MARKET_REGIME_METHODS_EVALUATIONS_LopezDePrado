@@ -1,8 +1,8 @@
 # Crypto Regime-Change Detection
 
 This repository contains a reproducible empirical report on crypto market
-structure-break diagnostics inspired by Chapter 17 of Marcos Lopez de Prado's
-*Advances in Financial Machine Learning*.
+structure-break diagnostics inspired by structural-break methods in Marcos
+Lopez de Prado's *Advances in Financial Machine Learning*.
 
 The analysis uses Binance daily OHLCV data for BTC, ETH, ETC, SOL, and HYPE.
 Spot markets are used where Binance spot history is available; HYPE falls back
@@ -12,12 +12,17 @@ the data was downloaded.
 ## Outputs
 
 - `regime_detection_crypto_report.pdf` is the rendered report.
-- `regime_detection_crypto_report.tex` is the LaTeX source.
+- `regime_detection_crypto_report.tex` is generated from
+  `regime_detection_crypto_report_template.tex`.
 - `scripts/generate_daily_regime_chapter.py` downloads data, computes
-  diagnostics, runs simple long/flat backtests, and regenerates figures/tables.
+  diagnostics, runs simple long/flat backtests, calibrates finite-sample ADF
+  critical values, and regenerates figures/tables/report source.
 - `data/binance_daily/` contains downloaded daily data plus diagnostic and
   strategy CSVs.
+- `data/calibration/` contains cached Monte Carlo critical-value files.
 - `regime_chapter_figs/` contains all generated figures.
+- `tests/` contains focused tests for core math, online-safety, and backtest
+  assumptions.
 
 ## BTC Backtest Example
 
@@ -30,10 +35,9 @@ close-to-close return.
   <img src="regime_chapter_figs/fig_strategy_pnl_BTC.png" alt="BTC long/flat strategy PnL curves" width="640">
 </p>
 
-The strategy ranking is in-sample and should be treated as indicative only.
-Choosing the best-performing signal after seeing all PnLs introduces
-model-selection/data-snooping risk even though the individual signal returns are
-shifted to avoid same-close look-ahead.
+The strategy ranking is in-sample and should be treated as indicative only. The
+report includes walk-forward and bootstrap checks, but the signal family still
+needs external validation before any trading interpretation.
 
 ## Reproduce
 
@@ -41,6 +45,19 @@ shifted to avoid same-close look-ahead.
 python3 scripts/generate_daily_regime_chapter.py
 pdflatex -interaction=nonstopmode regime_detection_crypto_report.tex
 pdflatex -interaction=nonstopmode regime_detection_crypto_report.tex
+```
+
+The first full run builds 2,000-simulation calibration caches and can take a
+while. For a fast local rebuild from already downloaded data:
+
+```bash
+python3 scripts/generate_daily_regime_chapter.py --skip-download --use-cache
+```
+
+Run tests with:
+
+```bash
+pytest -q
 ```
 
 The generator writes strict JSON metadata to `regime_chapter_results.json`.
