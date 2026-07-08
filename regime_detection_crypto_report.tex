@@ -708,7 +708,7 @@ with a variance floor and quantile-based initialization (so no random seed is ne
 
 The consensus detector fires only when at least two independent families agree on the same day:
 \[
-    \mathrm{Consensus}_t = \mathbb{1}\!\left\{\ \sum_{m\,\in\,\{\mathrm{BDE},\,\mathrm{CSW},\,\mathrm{SADF},\,\mathrm{SMT}\}} \mathrm{alert}_{m,t}\ \ge\ 2\ \right\},
+    \mathrm{Consensus}_t = \mathbf{1}\!\left\{\ \sum_{m\,\in\,\{\mathrm{BDE},\,\mathrm{CSW},\,\mathrm{SADF},\,\mathrm{SMT}\}} \mathrm{alert}_{m,t}\ \ge\ 2\ \right\},
 \]
 where $\mathrm{alert}_{m,t}\in\{0,1\}$ is the (momentum-gated) alert of member $m$ defined next. The QADF, CADF, and HMM signals are not part of the vote.
 
@@ -716,7 +716,7 @@ where $\mathrm{alert}_{m,t}\in\{0,1\}$ is the (momentum-gated) alert of member $
 
 Every structural-break statistic $g_t$ is turned into a binary alert by a purely causal, self-referential threshold: the alert fires when the statistic exceeds the $95$th percentile of its own strictly-prior history,
 \[
-    \mathrm{alert}_t = \mathbb{1}\!\left\{\ g_t > Q_{0.95}\big(\{g_i\}_{i<t}\big)\ \right\}\ \wedge\ \mathbb{1}\{\,y_t-y_{t-20}>0\,\},
+    \mathrm{alert}_t = \mathbf{1}\!\left\{\ g_t > Q_{0.95}\big(\{g_i\}_{i<t}\big)\ \right\}\ \wedge\ \mathbf{1}\{\,y_t-y_{t-20}>0\,\},
 \]
 using an expanding window with a $60$-observation warm-up, shifted by one day so no contemporaneous information leaks. The second factor is the $20$-day momentum gate. (CSW uses its own zero boundary $\mathrm{CSW}_t>0$ in place of the quantile; the HMM uses its filtered bull-state indicator directly.) An alert opens a long position held for $H=20$ days, and the traded position is lagged one day for next-close execution:
 \[
