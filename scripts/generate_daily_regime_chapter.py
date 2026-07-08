@@ -72,8 +72,12 @@ DEFAULT_BOOTSTRAP_SIMS = 500
 DEFAULT_BOOTSTRAP_SEED = 777
 DEFAULT_WALK_FORWARD_TRAIN_MIN = 730
 DEFAULT_WALK_FORWARD_TEST_SIZE = 180
+DEFAULT_HMM_STATES = 3
+DEFAULT_HMM_REFIT_DAYS = 126
+DEFAULT_HMM_MIN_HISTORY = 365
+DEFAULT_HMM_EM_ITER = 100
 TAU_SENSITIVITY_FRACTIONS = (0.10, 0.15, 0.20)
-STRATEGY_NAMES = ("BuyHold", "BDE", "CSW", "SADF", "QADF", "CADF", "SMT", "Consensus")
+STRATEGY_NAMES = ("BuyHold", "BDE", "CSW", "SADF", "QADF", "CADF", "SMT", "HMM", "Consensus")
 STRUCTURE_STRATEGIES = tuple(name for name in STRATEGY_NAMES if name != "BuyHold")
 CALIBRATION_VERSION = "adf_zero_lag_v2"
 
@@ -96,6 +100,9 @@ class RunConfig:
     bootstrap_seed: int = DEFAULT_BOOTSTRAP_SEED
     walk_forward_train_min: int = DEFAULT_WALK_FORWARD_TRAIN_MIN
     walk_forward_test_size: int = DEFAULT_WALK_FORWARD_TEST_SIZE
+    hmm_states: int = DEFAULT_HMM_STATES
+    hmm_refit_days: int = DEFAULT_HMM_REFIT_DAYS
+    hmm_min_history: int = DEFAULT_HMM_MIN_HISTORY
     use_cache: bool = False
     skip_download: bool = False
     workers: int = max(1, min(8, os.cpu_count() or 1))
@@ -496,45 +503,73 @@ def _prefix(values: np.ndarray) -> np.ndarray:
     return np.r_[0.0, np.cumsum(values)]
 
 
-def smt_exp_and_poly(logp: np.ndarray, price_norm: np.ndarray, tau: int, phi: float = 0.5) -> np.ndarray:
-    """SMT-style score from exponential and quadratic trend forms."""
+def smt_trend_score(logp: np.ndarray, price_norm: np.ndarray, tau: int, phi: float = 0.5) -> np.ndarray:
+    """SMT-style score from the AFML 17.4.3 trend battery.
+
+    Covers all four book specifications: SM-Poly1 (quadratic trend on raw
+    normalized price), SM-Poly2 (quadratic trend on log price), SM-Exp
+    (linear trend on log price), and SM-Power (log price on log time). Each
+    absolute trend t-statistic is penalized by window length to the power
+    ``phi`` before taking the supremum over backward windows.
+    """
 
     n = len(logp)
     t = np.arange(1, n + 1, dtype=float)
-    p = {
-        "1": _prefix(np.ones(n)),
-        "t": _prefix(t),
-        "t2": _prefix(t**2),
-        "t3": _prefix(t**3),
-        "t4": _prefix(t**4),
-    }
+    logt = np.log(t)
+    ones = _prefix(np.ones(n))
+    pt = _prefix(t)
+    pt2 = _prefix(t**2)
+    pt3 = _prefix(t**3)
+    pt4 = _prefix(t**4)
+    pu = _prefix(logt)
+    pu2 = _prefix(logt**2)
 
-    def linear_tstat(y: np.ndarray, end: int, starts: np.ndarray) -> np.ndarray:
-        py = _prefix(y)
-        pty = _prefix(t * y)
-        pyy = _prefix(y * y)
-        stop = end + 1
-        m = p["1"][stop] - p["1"][starts]
-        sx = p["t"][stop] - p["t"][starts]
-        sy = py[stop] - py[starts]
-        sxx = p["t2"][stop] - p["t2"][starts]
-        sxy = pty[stop] - pty[starts]
-        syy = pyy[stop] - pyy[starts]
-        return _ols_beta_tstat_intercept_from_sums(m, sx, sy, sxx, sxy, syy)
+    py_log = _prefix(logp)
+    pyy_log = _prefix(logp * logp)
+    pty_log = _prefix(t * logp)
+    pt2y_log = _prefix((t**2) * logp)
+    puy_log = _prefix(logt * logp)
+    py_pr = _prefix(price_norm)
+    pyy_pr = _prefix(price_norm * price_norm)
+    pty_pr = _prefix(t * price_norm)
+    pt2y_pr = _prefix((t**2) * price_norm)
 
-    def quadratic_tstat(y: np.ndarray, end: int, starts: np.ndarray) -> np.ndarray:
-        py = _prefix(y)
-        pty = _prefix(t * y)
-        pt2y = _prefix((t**2) * y)
-        pyy = _prefix(y * y)
+    def linear_tstat(
+        end: int,
+        starts: np.ndarray,
+        px: np.ndarray,
+        pxx: np.ndarray,
+        pxy: np.ndarray,
+        py: np.ndarray,
+        pyy: np.ndarray,
+    ) -> np.ndarray:
         stop = end + 1
-        m = p["1"][stop] - p["1"][starts]
+        m = ones[stop] - ones[starts]
+        return _ols_beta_tstat_intercept_from_sums(
+            m,
+            px[stop] - px[starts],
+            py[stop] - py[starts],
+            pxx[stop] - pxx[starts],
+            pxy[stop] - pxy[starts],
+            pyy[stop] - pyy[starts],
+        )
+
+    def quadratic_tstat(
+        end: int,
+        starts: np.ndarray,
+        py: np.ndarray,
+        pty: np.ndarray,
+        pt2y: np.ndarray,
+        pyy: np.ndarray,
+    ) -> np.ndarray:
+        stop = end + 1
+        m = ones[stop] - ones[starts]
         mats = np.empty((len(starts), 3, 3), dtype=float)
         mats[:, 0, 0] = m
-        mats[:, 0, 1] = mats[:, 1, 0] = p["t"][stop] - p["t"][starts]
-        mats[:, 0, 2] = mats[:, 1, 1] = mats[:, 2, 0] = p["t2"][stop] - p["t2"][starts]
-        mats[:, 1, 2] = mats[:, 2, 1] = p["t3"][stop] - p["t3"][starts]
-        mats[:, 2, 2] = p["t4"][stop] - p["t4"][starts]
+        mats[:, 0, 1] = mats[:, 1, 0] = pt[stop] - pt[starts]
+        mats[:, 0, 2] = mats[:, 1, 1] = mats[:, 2, 0] = pt2[stop] - pt2[starts]
+        mats[:, 1, 2] = mats[:, 2, 1] = pt3[stop] - pt3[starts]
+        mats[:, 2, 2] = pt4[stop] - pt4[starts]
         vecs = np.column_stack(
             [
                 py[stop] - py[starts],
@@ -564,14 +599,233 @@ def smt_exp_and_poly(logp: np.ndarray, price_norm: np.ndarray, tau: int, phi: fl
         starts = np.arange(0, end - tau + 1)
         m = end - starts + 1
         penalty = m.astype(float) ** phi
-        exp_stat = np.abs(linear_tstat(logp, end, starts)) / penalty
-        poly_log = quadratic_tstat(logp, end, starts) / penalty
-        poly_price = quadratic_tstat(price_norm, end, starts) / penalty
-        vals = np.concatenate([exp_stat, poly_log, poly_price])
+        exp_stat = np.abs(linear_tstat(end, starts, pt, pt2, pty_log, py_log, pyy_log)) / penalty
+        power_stat = np.abs(linear_tstat(end, starts, pu, pu2, puy_log, py_log, pyy_log)) / penalty
+        poly_log = quadratic_tstat(end, starts, py_log, pty_log, pt2y_log, pyy_log) / penalty
+        poly_price = quadratic_tstat(end, starts, py_pr, pty_pr, pt2y_pr, pyy_pr) / penalty
+        vals = np.concatenate([exp_stat, power_stat, poly_log, poly_price])
         vals = vals[np.isfinite(vals)]
         if len(vals):
             score[end] = float(np.max(vals))
     return score
+
+
+def _gaussian_diag_loglik(x: np.ndarray, means: np.ndarray, variances: np.ndarray) -> np.ndarray:
+    """Log density of each row of ``x`` under each diagonal-Gaussian state."""
+
+    diff = x[:, None, :] - means[None, :, :]
+    quad = np.sum(diff * diff / variances[None, :, :], axis=2)
+    norm = np.sum(np.log(2.0 * np.pi * variances), axis=1)
+    return -0.5 * (quad + norm[None, :])
+
+
+def _hmm_forward_filter(
+    x: np.ndarray,
+    start: np.ndarray,
+    trans: np.ndarray,
+    means: np.ndarray,
+    variances: np.ndarray,
+) -> tuple[np.ndarray, float]:
+    """Scaled forward pass. Row t of the output uses observations 0..t only.
+
+    Returns the filtered state probabilities and the total log-likelihood.
+    """
+
+    log_b = _gaussian_diag_loglik(x, means, variances)
+    row_max = log_b.max(axis=1)
+    b = np.exp(log_b - row_max[:, None])
+    n, k = b.shape
+    alpha = np.empty((n, k))
+    scale = np.empty(n)
+    a = start * b[0]
+    scale[0] = max(a.sum(), 1e-300)
+    alpha[0] = a / scale[0]
+    for t in range(1, n):
+        a = (alpha[t - 1] @ trans) * b[t]
+        scale[t] = max(a.sum(), 1e-300)
+        alpha[t] = a / scale[t]
+    loglik = float(np.sum(np.log(scale)) + np.sum(row_max))
+    return alpha, loglik
+
+
+def fit_gaussian_hmm(
+    x: np.ndarray,
+    n_states: int,
+    *,
+    n_iter: int = DEFAULT_HMM_EM_ITER,
+    tol: float = 1e-6,
+) -> dict | None:
+    """Deterministic EM fit of a diagonal-covariance Gaussian HMM.
+
+    Initialization is deterministic (states seeded from quantile slices of the
+    first feature), so repeated fits on identical data give identical models.
+    Returns ``None`` when the sample is too short or the fit degenerates.
+    """
+
+    x = np.asarray(x, dtype=float)
+    n, d = x.shape
+    if n < max(8 * n_states, 2 * d + 2) or not np.isfinite(x).all():
+        return None
+    var_floor = np.maximum(np.var(x, axis=0), 1e-12) * 1e-4 + 1e-12
+
+    order = np.argsort(x[:, 0], kind="mergesort")
+    means = np.empty((n_states, d))
+    variances = np.empty((n_states, d))
+    for state, chunk in enumerate(np.array_split(order, n_states)):
+        means[state] = x[chunk].mean(axis=0)
+        variances[state] = np.maximum(x[chunk].var(axis=0), var_floor)
+    start = np.full(n_states, 1.0 / n_states)
+    if n_states > 1:
+        trans = np.full((n_states, n_states), 0.1 / (n_states - 1))
+        np.fill_diagonal(trans, 0.9)
+    else:
+        trans = np.ones((1, 1))
+
+    prev_loglik = -np.inf
+    for _ in range(n_iter):
+        log_b = _gaussian_diag_loglik(x, means, variances)
+        row_max = log_b.max(axis=1)
+        b = np.exp(log_b - row_max[:, None])
+
+        alpha = np.empty((n, n_states))
+        scale = np.empty(n)
+        a = start * b[0]
+        scale[0] = max(a.sum(), 1e-300)
+        alpha[0] = a / scale[0]
+        for t in range(1, n):
+            a = (alpha[t - 1] @ trans) * b[t]
+            scale[t] = max(a.sum(), 1e-300)
+            alpha[t] = a / scale[t]
+
+        beta = np.empty((n, n_states))
+        beta[-1] = 1.0
+        for t in range(n - 2, -1, -1):
+            beta[t] = (trans @ (b[t + 1] * beta[t + 1])) / scale[t + 1]
+
+        gamma = alpha * beta
+        gamma /= np.maximum(gamma.sum(axis=1, keepdims=True), 1e-300)
+        xi_sum = trans * (alpha[:-1].T @ ((b[1:] * beta[1:]) / scale[1:, None]))
+        loglik = float(np.sum(np.log(scale)) + np.sum(row_max))
+
+        start = np.maximum(gamma[0], 1e-12)
+        start /= start.sum()
+        trans = np.maximum(xi_sum, 1e-12)
+        trans /= trans.sum(axis=1, keepdims=True)
+        weights = np.maximum(gamma.sum(axis=0), 1e-8)
+        means = (gamma.T @ x) / weights[:, None]
+        variances = np.maximum((gamma.T @ (x * x)) / weights[:, None] - means**2, var_floor)
+
+        if not np.isfinite(loglik):
+            return None
+        if abs(loglik - prev_loglik) < tol * max(1.0, abs(prev_loglik)):
+            prev_loglik = loglik
+            break
+        prev_loglik = loglik
+
+    # Final E-step responsibilities under the converged parameters.
+    log_b = _gaussian_diag_loglik(x, means, variances)
+    row_max = log_b.max(axis=1)
+    b = np.exp(log_b - row_max[:, None])
+    alpha = np.empty((n, n_states))
+    scale = np.empty(n)
+    a = start * b[0]
+    scale[0] = max(a.sum(), 1e-300)
+    alpha[0] = a / scale[0]
+    for t in range(1, n):
+        a = (alpha[t - 1] @ trans) * b[t]
+        scale[t] = max(a.sum(), 1e-300)
+        alpha[t] = a / scale[t]
+    beta = np.empty((n, n_states))
+    beta[-1] = 1.0
+    for t in range(n - 2, -1, -1):
+        beta[t] = (trans @ (b[t + 1] * beta[t + 1])) / scale[t + 1]
+    gamma = alpha * beta
+    gamma /= np.maximum(gamma.sum(axis=1, keepdims=True), 1e-300)
+
+    return {
+        "start": start,
+        "trans": trans,
+        "means": means,
+        "variances": variances,
+        "gamma": gamma,
+        "loglik": prev_loglik,
+    }
+
+
+def hmm_regime_signal(
+    logp: np.ndarray,
+    *,
+    n_states: int = DEFAULT_HMM_STATES,
+    refit_days: int = DEFAULT_HMM_REFIT_DAYS,
+    min_history: int = DEFAULT_HMM_MIN_HISTORY,
+    momentum_days: int = DEFAULT_MOMENTUM_DAYS,
+    n_iter: int = DEFAULT_HMM_EM_ITER,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Walk-forward Gaussian HMM regime filter with no forward-looking bias.
+
+    Design guarantees against lookahead:
+
+    - Features at close ``t`` (daily log return and ``momentum_days`` log
+      momentum) use prices through ``t`` only.
+    - Model parameters used for close ``t`` are fitted on features strictly
+      before the most recent refit date, which is itself ``<= t``.
+    - The regime at close ``t`` is the argmax of *filtered* probabilities
+      from a forward pass over features ``0..t`` (never smoothed with future
+      observations).
+    - The regime-to-signal map (which state is bullish) is computed from the
+      training window only, using EM responsibilities against same-window
+      returns.
+    - Refit dates are fixed absolute indices, so the value at ``t`` does not
+      change when future data is appended.
+
+    Returns a boolean bull-signal array and an integer state array (``-1``
+    where no model is available), both aligned to ``logp``.
+    """
+
+    n = len(logp)
+    signal = np.zeros(n, dtype=bool)
+    states = np.full(n, -1, dtype=int)
+    if n <= momentum_days + 1:
+        return signal, states
+
+    t_idx = np.arange(momentum_days, n)
+    features = np.column_stack(
+        [
+            logp[t_idx] - logp[t_idx - 1],
+            logp[t_idx] - logp[t_idx - momentum_days],
+        ]
+    )
+    n_feat = len(features)
+    if n_feat <= min_history:
+        return signal, states
+
+    model: dict | None = None
+    bull_state: int | None = None
+    fit_at = min_history
+    while fit_at < n_feat:
+        block_end = min(fit_at + refit_days, n_feat)
+        fitted = fit_gaussian_hmm(features[:fit_at], n_states, n_iter=n_iter)
+        if fitted is not None:
+            model = fitted
+            gamma = fitted["gamma"]
+            weights = np.maximum(gamma.sum(axis=0), 1e-8)
+            state_mean_return = (gamma * features[:fit_at, [0]]).sum(axis=0) / weights
+            best = int(np.argmax(state_mean_return))
+            bull_state = best if state_mean_return[best] > 0 else None
+        if model is not None:
+            filtered, _ = _hmm_forward_filter(
+                features[:block_end],
+                model["start"],
+                model["trans"],
+                model["means"],
+                model["variances"],
+            )
+            block_states = np.argmax(filtered[fit_at:block_end], axis=1)
+            states[t_idx[fit_at:block_end]] = block_states
+            if bull_state is not None:
+                signal[t_idx[fit_at:block_end]] = block_states == bull_state
+        fit_at = block_end
+    return signal, states
 
 
 def top_quantile_flag(values: np.ndarray, q: float = 0.95) -> np.ndarray:
@@ -781,6 +1035,7 @@ def compute_strategy_suite(
     qadf: np.ndarray,
     cadf: np.ndarray,
     smt: np.ndarray,
+    hmm_bull: np.ndarray,
     config: RunConfig,
     *,
     write_csv: bool = True,
@@ -838,6 +1093,20 @@ def compute_strategy_suite(
         strategy_frame[f"equity_{name}"] = equity
         metrics[name] = stats
 
+    # HMM is a persistent regime state, not an alert event: hold the position
+    # exactly while the filtered bull state is active, with the same one-day
+    # execution shift as the alert strategies. No hold window or momentum gate.
+    hmm_event = pd.Series(np.asarray(hmm_bull, dtype=bool), index=close.index)
+    hmm_position = hmm_event.shift(1).fillna(False).astype(float)
+    hmm_returns, hmm_equity, hmm_stats = backtest_position(
+        dates, close, hmm_position, transaction_cost=config.transaction_cost
+    )
+    strategy_frame["event_HMM"] = hmm_event.astype(int)
+    strategy_frame["pos_HMM"] = hmm_position
+    strategy_frame["ret_HMM"] = hmm_returns
+    strategy_frame["equity_HMM"] = hmm_equity
+    metrics["HMM"] = hmm_stats
+
     best_signal = max(STRUCTURE_STRATEGIES, key=lambda name: metrics[name]["final_multiple"])
     best_including_buyhold = max(STRATEGY_NAMES, key=lambda name: metrics[name]["final_multiple"])
     out_csv = DATA_DIR / f"{asset}_strategy_daily.csv"
@@ -852,6 +1121,9 @@ def compute_strategy_suite(
             "signal_min_history": config.signal_min_history,
             "momentum_days": config.momentum_days,
             "hold_days": config.hold_days,
+            "hmm_states": config.hmm_states,
+            "hmm_refit_days": config.hmm_refit_days,
+            "hmm_min_history": config.hmm_min_history,
             "buyhold_entry_cost_charged": True,
         },
         "metrics": metrics,
@@ -1021,6 +1293,7 @@ def compute_tau_sensitivity(
     bde: np.ndarray,
     csw: np.ndarray,
     smt_default: np.ndarray,
+    hmm_bull: np.ndarray,
     config: RunConfig,
 ) -> list[dict]:
     rows = []
@@ -1040,6 +1313,7 @@ def compute_tau_sensitivity(
             qadf,
             cadf,
             smt_default,
+            hmm_bull,
             config,
             write_csv=False,
             include_validation=False,
@@ -1076,16 +1350,23 @@ def compute_asset(asset: str, frame: pd.DataFrame, choice: MarketChoice, config:
     bde = recursive_cusum(logp)
     csw = csw_excess(logp)
     sadf, qadf, cadf = adf_family(logp, tau)
-    smt = smt_exp_and_poly(logp, price_norm, tau)
+    smt = smt_trend_score(logp, price_norm, tau)
     sdfc_t, sdfc_idx = sdfc(logp, tau)
+    hmm_bull, hmm_states = hmm_regime_signal(
+        logp,
+        n_states=config.hmm_states,
+        refit_days=config.hmm_refit_days,
+        min_history=config.hmm_min_history,
+        momentum_days=config.momentum_days,
+    )
     flags = flag_summary(bde, csw, sadf, smt, config)
     runs = runs_from_flag(dates, flags["consensus_retro"])
     strategies, strategy_file = compute_strategy_suite(
-        asset, dates, close, logp, bde, csw, sadf, qadf, cadf, smt, config
+        asset, dates, close, logp, bde, csw, sadf, qadf, cadf, smt, hmm_bull, config
     )
     calibration = simulate_adf_critical_values(len(close), tau, config)
     critical_values = calibration.get("critical_values", {})
-    tau_sensitivity = compute_tau_sensitivity(dates, close, logp, bde, csw, smt, config)
+    tau_sensitivity = compute_tau_sensitivity(dates, close, logp, bde, csw, smt, hmm_bull, config)
 
     series = {
         "date": dates.dt.strftime("%Y-%m-%d"),
@@ -1097,6 +1378,8 @@ def compute_asset(asset: str, frame: pd.DataFrame, choice: MarketChoice, config:
         "qadf": qadf,
         "cadf": cadf,
         "smt": smt,
+        "hmm_state": hmm_states,
+        "hmm_bull_flag": hmm_bull.astype(int),
         **{key: value.astype(int) if value.dtype == bool else value for key, value in flags.items()},
     }
     out_csv = DATA_DIR / f"{asset}_diagnostics_daily.csv"
@@ -1125,6 +1408,18 @@ def compute_asset(asset: str, frame: pd.DataFrame, choice: MarketChoice, config:
         "max_csw_value": finite_nanmax(csw),
         "max_smt": max_date(dates, smt),
         "max_smt_value": finite_nanmax(smt),
+        "hmm": {
+            "states": int(config.hmm_states),
+            "refit_days": int(config.hmm_refit_days),
+            "min_history": int(config.hmm_min_history),
+            "modeled_days": int(np.sum(hmm_states >= 0)),
+            "bull_days": int(np.sum(hmm_bull)),
+            "first_modeled_day": (
+                str(pd.Timestamp(dates.iloc[int(np.argmax(hmm_states >= 0))]).date())
+                if np.any(hmm_states >= 0)
+                else "none (insufficient history)"
+            ),
+        },
         "runs": runs,
         "run_count": int(len(runs)),
         "first_run": runs[0]["start"] if runs else "none",
@@ -1165,7 +1460,13 @@ def plot_normalized(results: dict[str, dict]):
 
 def plot_asset(asset: str, result: dict):
     diag = pd.read_csv(ROOT / result["diagnostics_file"], parse_dates=["date"])
-    fig, axes = plt.subplots(5, 1, figsize=(11, 12.5), sharex=True)
+    fig, axes = plt.subplots(
+        6,
+        1,
+        figsize=(11, 14),
+        sharex=True,
+        gridspec_kw={"height_ratios": [1.6, 1, 1, 1, 1, 0.75]},
+    )
     runs = result["runs"]
 
     axes[0].plot(diag["date"], diag["close"], color="#1f4e79", lw=1.25)
@@ -1195,8 +1496,37 @@ def plot_asset(asset: str, result: dict):
 
     axes[4].plot(diag["date"], diag["smt"], color="#8c510a", lw=1)
     axes[4].set_ylabel("SMT score")
-    axes[4].set_xlabel("Date")
     shade_runs(axes[4], runs)
+
+    hmm_states = int(result.get("hmm", {}).get("states", DEFAULT_HMM_STATES))
+    state = diag["hmm_state"].astype(float).where(diag["hmm_state"] >= 0)
+    bull = diag["hmm_bull_flag"].astype(bool)
+    axes[5].fill_between(
+        diag["date"],
+        -0.5,
+        hmm_states - 0.5,
+        where=bull,
+        color="#1a9850",
+        alpha=0.22,
+        step="mid",
+        lw=0,
+    )
+    axes[5].plot(diag["date"], state, color="#d73027", lw=1, drawstyle="steps-mid")
+    axes[5].set_ylim(-0.6, hmm_states - 0.4)
+    axes[5].set_yticks(range(hmm_states))
+    axes[5].set_ylabel("HMM state")
+    axes[5].set_xlabel("Date")
+    if not (diag["hmm_state"] >= 0).any():
+        axes[5].text(
+            0.5,
+            0.5,
+            "insufficient history for HMM",
+            transform=axes[5].transAxes,
+            ha="center",
+            va="center",
+            fontsize=9,
+            color="#666666",
+        )
 
     for ax in axes:
         ax.grid(True, alpha=0.22)
@@ -1246,6 +1576,7 @@ def plot_strategy_asset(asset: str, result: dict):
         "QADF": "#2d708e",
         "CADF": "#5aae61",
         "SMT": "#8c510a",
+        "HMM": "#d73027",
         "Consensus": "#c51b7d",
     }
     for name in STRATEGY_NAMES:
@@ -1286,7 +1617,7 @@ def plot_strategy_heatmap(results: dict[str, dict]):
     ax.set_yticks(np.arange(len(assets)), assets)
     ax.set_xticks(
         np.arange(len(STRATEGY_NAMES)),
-        ["Buy&hold", "BDE", "CSW", "SADF", "QADF", "CADF", "SMT", "Consensus"],
+        ["Buy&hold", "BDE", "CSW", "SADF", "QADF", "CADF", "SMT", "HMM", "Consensus"],
         rotation=35,
         ha="right",
     )
@@ -1351,6 +1682,24 @@ def latex_escape(value: object) -> str:
     return "".join(replacements.get(char, char) for char in text)
 
 
+def compress_signal_path(path: str) -> str:
+    """Compress consecutive repeats: 'CSW, CSW, HMM' -> 'CSW x2, HMM'."""
+
+    names = [part.strip() for part in path.split(",") if part.strip()]
+    if not names:
+        return "n/a"
+    parts: list[str] = []
+    run_name, run_len = names[0], 1
+    for name in names[1:]:
+        if name == run_name:
+            run_len += 1
+            continue
+        parts.append(run_name if run_len == 1 else f"{run_name} x{run_len}")
+        run_name, run_len = name, 1
+    parts.append(run_name if run_len == 1 else f"{run_name} x{run_len}")
+    return ", ".join(parts)
+
+
 def strategy_label(name: str) -> str:
     return "Buy-and-hold" if name == "BuyHold" else name
 
@@ -1412,7 +1761,7 @@ def render_rows(results: dict[str, dict], config: RunConfig) -> dict[str, str | 
             )
         wf = strat["walk_forward"]["aggregate"]
         walk_forward_lines.append(
-            f"{asset} & {wf['blocks']} & {wf['test_days']} & {latex_escape(wf['selected_signals'])} & "
+            f"{asset} & {wf['blocks']} & {wf['test_days']} & {latex_escape(compress_signal_path(wf['selected_signals']))} & "
             f"{mult(wf['final_multiple'])} & {num(wf['sharpe'])} & {pct(wf['max_drawdown'])} \\\\"
         )
         mt = strat["multiple_testing"]
@@ -1428,6 +1777,14 @@ def render_rows(results: dict[str, dict], config: RunConfig) -> dict[str, str | 
             if not r["sdfc_candidate"].startswith("insufficient")
             else "The SDFC sample guard marks this series as insufficient for that statistic."
         )
+        hmm_info = r.get("hmm", {})
+        if hmm_info.get("modeled_days", 0) > 0:
+            hmm_sentence = (
+                f" The walk-forward HMM covers {hmm_info['modeled_days']} daily observations from "
+                f"{hmm_info['first_modeled_day']} and spends {hmm_info['bull_days']} of them in its bull state."
+            )
+        else:
+            hmm_sentence = " The series is too short for the walk-forward HMM, so its strategy stays flat."
         hype_note = (
             " HYPE uses Binance USD-M futures price klines; strategy returns exclude funding, carry, basis, and futures-specific execution costs."
             if asset == "HYPE"
@@ -1441,12 +1798,12 @@ def render_rows(results: dict[str, dict], config: RunConfig) -> dict[str, str | 
                     f"{r['run_count']} retrospective consensus alert run(s) were flagged on the daily clock. "
                     f"The first listed run begins on {r['first_run']}. {sdfc_sentence} "
                     f"SADF peaks on {r['max_sadf']}, the two-sided CSW heuristic peaks on {r['max_csw']}, "
-                    f"and the SMT score peaks on {r['max_smt']}.{hype_note}",
+                    f"and the SMT score peaks on {r['max_smt']}.{hmm_sentence}{hype_note}",
                     "",
                     "\\begin{figure}[H]",
                     "\\centering",
                     f"\\includegraphics[width=0.98\\textwidth]{{regime_chapter_figs/fig_asset_{asset}.pdf}}",
-                    f"\\caption{{{asset} structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal.}}",
+                    f"\\caption{{{asset} structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal. Green shading in the bottom panel marks the filtered HMM bull state, which is the online HMM strategy state.}}",
                     "\\end{figure}",
                 ]
             )
@@ -1464,6 +1821,7 @@ def render_rows(results: dict[str, dict], config: RunConfig) -> dict[str, str | 
         f"Momentum gate & trailing {config.momentum_days}-day log return must be positive \\\\",
         f"Holding window & {config.hold_days} calendar daily observations after an alert \\\\",
         f"Minimum diagnostic window & $\\max(60, \\lceil {config.tau_fraction:.2f} n \\rceil)$ \\\\",
+        f"HMM regime model & {config.hmm_states} states, refit every {config.hmm_refit_days} obs, min {config.hmm_min_history} training obs \\\\",
         f"ADF Monte Carlo calibration & {config.calibration_sims} random-walk simulations, seed {config.calibration_seed} \\\\",
         f"Walk-forward validation & expanding {config.walk_forward_train_min}-day train, {config.walk_forward_test_size}-day test blocks \\\\",
     ]
@@ -1474,6 +1832,7 @@ def render_rows(results: dict[str, dict], config: RunConfig) -> dict[str, str | 
         "SADF/QADF/CADF visual flags & full-sample top 5\\% & no & no \\\\",
         "SADF/QADF/CADF critical exceedances & simulated random-walk finite-sample critical values & approximate & no, retrospective inference only \\\\",
         "SDFC & full-sample unknown-break scan & no in this report & no \\\\",
+        "HMM regime filter & walk-forward Gaussian HMM, filtered (causal) state probabilities & no & yes \\\\",
         "Long/flat strategies & prior expanding thresholds plus one-day execution shift & no & yes \\\\",
     ]
 
@@ -1529,6 +1888,9 @@ def parse_args(argv: Sequence[str] | None = None) -> RunConfig:
     parser.add_argument("--bootstrap-seed", type=int, default=DEFAULT_BOOTSTRAP_SEED)
     parser.add_argument("--walk-forward-train-min", type=int, default=DEFAULT_WALK_FORWARD_TRAIN_MIN)
     parser.add_argument("--walk-forward-test-size", type=int, default=DEFAULT_WALK_FORWARD_TEST_SIZE)
+    parser.add_argument("--hmm-states", type=int, default=DEFAULT_HMM_STATES)
+    parser.add_argument("--hmm-refit-days", type=int, default=DEFAULT_HMM_REFIT_DAYS)
+    parser.add_argument("--hmm-min-history", type=int, default=DEFAULT_HMM_MIN_HISTORY)
     parser.add_argument("--workers", type=int, default=max(1, min(8, os.cpu_count() or 1)))
     parser.add_argument("--use-cache", action="store_true")
     parser.add_argument("--skip-download", action="store_true")
@@ -1547,6 +1909,9 @@ def parse_args(argv: Sequence[str] | None = None) -> RunConfig:
         bootstrap_seed=args.bootstrap_seed,
         walk_forward_train_min=args.walk_forward_train_min,
         walk_forward_test_size=args.walk_forward_test_size,
+        hmm_states=max(1, args.hmm_states),
+        hmm_refit_days=max(1, args.hmm_refit_days),
+        hmm_min_history=max(30, args.hmm_min_history),
         use_cache=args.use_cache,
         skip_download=args.skip_download,
         workers=max(1, args.workers),

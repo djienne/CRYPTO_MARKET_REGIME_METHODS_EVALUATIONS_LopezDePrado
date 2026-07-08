@@ -27,14 +27,14 @@
 \title{\Huge Detecting Structural Breaks in Crypto Markets\\[0.25em]
 \Large A beginner-friendly empirical report inspired by structural-break methods in \emph{Advances in Financial Machine Learning}}
 \author{Prepared from Binance daily OHLC market data}
-\date{Generated on 2026-05-19}
+\date{Generated on 2026-07-08}
 
 \begin{document}
 \maketitle
 
 \begin{center}
 \fbox{\begin{minipage}{0.92\textwidth}
-\textbf{What this report does.} We take historical crypto price data for BTC, ETH, ETC, SOL, and HYPE and apply structural-break diagnostics: a BDE-inspired recursive forecast-error CUSUM, Chu-Stinchcombe-White CUSUM, Chow-type Dickey-Fuller, SADF, QADF, a conditional-tail ADF summary, and sub/super-martingale trend tests. The goal is educational: show how the tests behave, how to interpret the plots, and why one should treat flagged regimes as research features rather than automatic trading signals.
+\textbf{What this report does.} We take historical crypto price data for BTC, ETH, ETC, SOL, and HYPE and apply structural-break diagnostics: a BDE-inspired recursive forecast-error CUSUM, Chu-Stinchcombe-White CUSUM, Chow-type Dickey-Fuller, SADF, QADF, a conditional-tail ADF summary, and sub/super-martingale trend tests (SM-Exp, SM-Power, SM-Poly1, SM-Poly2), plus a walk-forward Gaussian hidden Markov model (HMM) regime filter. The goal is educational: show how the tests behave, how to interpret the plots, and why one should treat flagged regimes as research features rather than automatic trading signals.
 \end{minipage}}
 \end{center}
 
@@ -47,7 +47,7 @@ A \textbf{structural break} is a change in the data-generating mechanism. In mar
 
 \section{Data and Parameters}
 
-The raw source data are Binance daily OHLCV klines. The report uses the largest available Binance spot USDT history where spot is available. HYPEUSDT is not available on Binance spot in the API check used here, so HYPE falls back to Binance USD-M futures daily klines. All diagnostics are computed on daily closes through 2026-05-18.
+The raw source data are Binance daily OHLCV klines. The report uses the largest available Binance spot USDT history where spot is available. HYPEUSDT is not available on Binance spot in the API check used here, so HYPE falls back to Binance USD-M futures daily klines. All diagnostics are computed on daily closes through 2026-07-07.
 
 \begin{figure}[H]
 \centering
@@ -60,15 +60,15 @@ The raw source data are Binance daily OHLCV klines. The report uses the largest 
 \scriptsize
 \setlength{\tabcolsep}{3pt}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{@{}llccrrrrrcccr@{}}
+\begin{tabular}{@{}llccrrcrcccr@{}}
 \toprule
 Asset & Source & Raw start & Raw end & Raw rows & $\tau$ & SDFC candidate & SDFC $t$ & Max SADF & Max CSW & Max SMT & Runs \\
 \midrule
-BTC & Binance spot & 2017-08-17 & 2026-05-18 & 3197 & 480 & 2018-12-16 & 1.51 & 2021-01-08 & 2020-03-12 & 2025-10-09 & 16 \\
-ETH & Binance spot & 2017-08-17 & 2026-05-18 & 3197 & 480 & 2020-03-13 & 0.99 & 2021-05-11 & 2020-03-12 & 2021-12-02 & 20 \\
-ETC & Binance spot & 2018-06-12 & 2026-05-18 & 2898 & 435 & none (non-positive t) & -0.19 & 2021-05-06 & 2020-03-12 & 2021-11-03 & 5 \\
-SOL & Binance spot & 2020-08-11 & 2026-05-18 & 2107 & 317 & 2022-12-30 & 0.62 & 2023-12-25 & 2022-11-09 & 2023-01-12 & 9 \\
-HYPE & Binance USD-M futures & 2025-05-30 & 2026-05-18 & 354 & 60 & 2026-01-21 & 1.44 & 2025-12-18 & 2026-01-28 & 2025-12-28 & 5 \\
+BTC & Binance spot & 2017-08-17 & 2026-07-07 & 3247 & 488 & 2019-02-08 & 1.38 & 2021-01-08 & 2020-03-12 & 2025-10-28 & 16 \\
+ETH & Binance spot & 2017-08-17 & 2026-07-07 & 3247 & 488 & 2020-03-13 & 0.90 & 2021-05-11 & 2020-03-12 & 2021-12-09 & 18 \\
+ETC & Binance spot & 2018-06-12 & 2026-07-07 & 2948 & 443 & none (non-positive t) & -0.26 & 2021-05-06 & 2020-03-12 & 2021-11-17 & 6 \\
+SOL & Binance spot & 2020-08-11 & 2026-07-07 & 2157 & 324 & 2022-12-30 & 0.59 & 2023-12-25 & 2022-11-09 & 2022-01-04 & 10 \\
+HYPE & Binance USD-M futures & 2025-05-30 & 2026-07-07 & 404 & 61 & 2026-01-21 & 1.71 & 2026-06-01 & 2026-01-28 & 2025-12-28 & 7 \\
 \bottomrule
 \end{tabular}}
 \caption{Daily Binance data and headline diagnostic results. $\tau$ is the minimum daily window length used in recursive tests. Runs count retrospective consensus alert runs, where at least two diagnostic families were simultaneously in their research-alert region.}
@@ -76,7 +76,8 @@ HYPE & Binance USD-M futures & 2025-05-30 & 2026-05-18 & 354 & 60 & 2026-01-21 &
 
 \begin{table}[H]
 \centering
-\begin{tabular}{@{}ll@{}}
+\small
+\begin{tabular}{@{}lp{0.60\textwidth}@{}}
 \toprule
 Parameter & Value \\
 \midrule
@@ -86,6 +87,7 @@ Minimum online history & 60 finite observations \\
 Momentum gate & trailing 20-day log return must be positive \\
 Holding window & 20 calendar daily observations after an alert \\
 Minimum diagnostic window & $\max(60, \lceil 0.15 n \rceil)$ \\
+HMM regime model & 3 states, refit every 126 obs, min 365 training obs \\
 ADF Monte Carlo calibration & 2000 random-walk simulations, seed 123 \\
 Walk-forward validation & expanding 730-day train, 180-day test blocks \\
 \bottomrule
@@ -95,9 +97,34 @@ Walk-forward validation & expanding 730-day train, 180-day test blocks \\
 
 \section{Diagnostic Families}
 
+The table below maps each statistic in this report to the source material it is based on, so readers can connect the empirical output back to the original definitions.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Report statistic & Source & Fidelity \\
+\midrule
+BDE-inspired CUSUM & AFML \S17.3.1 (Brown-Durbin-Evans 1975) & inspired, online variant \\
+Two-sided CSW excess & AFML \S17.3.2 (Chu-Stinchcombe-White 1996) & two-sided heuristic \\
+SDFC & AFML \S17.4.1 (Chow-type Dickey-Fuller) & faithful, zero-lag \\
+SADF & AFML \S17.4.2 (Phillips-Wu-Yu 2011) & faithful, zero-lag \\
+QADF / CADF & AFML \S17.4.2.4--17.4.2.5 & faithful, zero-lag \\
+SMT score & AFML \S17.4.3 (SM-Exp/Power/Poly1/Poly2) & all four forms, one $\varphi$ \\
+HMM regime filter & Hamilton (1989); Cartea et al.\ Ch.~12 & walk-forward, filtered \\
+\bottomrule
+\end{tabular}
+\caption{Where each diagnostic comes from and how closely it follows the source definition.}
+\end{table}
+
 \subsection{CUSUM Tests}
 
-CUSUM means cumulative sum. The BDE-inspired series in this report is a recursive one-step forecast-error CUSUM from a simple log-price trend model. It is \textbf{not} a formal Brown-Durbin-Evans boundary test: residuals are normalized online with shifted expanding statistics so a value at close $t$ uses only information available through $t$.
+CUSUM means cumulative sum. The BDE-inspired series in this report is a recursive one-step forecast-error CUSUM from a simple log-price trend model. At each close $t$ the trend model is refitted on all data before $t$, and the standardized forecast error
+\[
+    \hat\omega_t = \frac{y_t - \hat\alpha_{t-1} - \hat\beta_{t-1} t}{\hat\sigma_{t-1}\sqrt{1 + h_t}},
+\]
+where $h_t$ is the regression leverage of the new point, is accumulated into a scaled running sum. It is \textbf{not} a formal Brown-Durbin-Evans boundary test: residuals are normalized online with shifted expanding statistics so a value at close $t$ uses only information available through $t$.
 
 The Chu-Stinchcombe-White statistic asks whether log price has moved too far from an earlier reference level relative to realized volatility:
 \[
@@ -117,7 +144,33 @@ For formal interpretation, the report now adds cached finite-sample random-walk 
 
 \subsection{SMT-Style Trend Tests}
 
-The sub/super-martingale score evaluates exponential and quadratic trend forms on normalized price and log price. High values flag unusually strong trend-like growth or collapse. They are useful features, but the reported score is a compact heuristic rather than a complete production SMT battery.
+The sub/super-martingale score evaluates the four trend specifications from the source text: an exponential trend on log price (SM-Exp), a power trend of log price on log time (SM-Power), and quadratic trends on normalized raw price (SM-Poly1) and log price (SM-Poly2). For each specification the trend coefficient $\hat\beta_{t_0,t}$ is estimated on backward windows and the penalized absolute t-statistic is aggregated as
+\[
+    \mathrm{SMT}_t = \sup_{t_0 \in [1, t-\tau]}
+    \left\{ \frac{\left|\hat\beta_{t_0,t}\right|}{\hat\sigma_{\beta_{t_0,t}}\,(t - t_0)^{\varphi}} \right\},
+    \qquad \varphi = 0.5,
+\]
+where the penalty $(t-t_0)^{\varphi}$ prevents long windows from dominating through mechanically large t-values. High values flag unusually strong trend-like growth or collapse. They are useful features, but the reported score is a compact heuristic rather than a complete production SMT battery across many $\varphi$ values.
+
+\subsection{Hidden Markov Regime Model}
+
+In addition to the structural-break statistics, the report fits a Gaussian hidden Markov model (HMM) on two causal daily features: the one-day log return and a trailing multi-day log momentum. The HMM is a different kind of regime tool: instead of testing for a break against a reference model, it assumes the market switches between a small number of latent states $s_t$ following a Markov chain with transition matrix $A$, and that the observed feature vector is drawn from a state-specific Gaussian,
+\[
+    x_t \mid s_t = k \sim \mathcal{N}(\mu_k, \Sigma_k),
+    \qquad
+    \Pr[s_t = k \mid x_{1:t}] \propto
+    \left( \textstyle\sum_j \Pr[s_{t-1} = j \mid x_{1:t-1}]\, A_{jk} \right) \mathcal{N}(x_t; \mu_k, \Sigma_k).
+\]
+The right-hand recursion is the \emph{filtered} state probability: it conditions only on observations up to $t$. This latent-state view goes back to Markov-switching models in econometrics and connects to the Markov-chain regime models used for order-flow states in the algorithmic-trading literature.
+
+The implementation is designed so that no forward-looking information can reach the trading signal:
+\begin{itemize}
+    \item Parameters are re-estimated walk-forward on an expanding window at fixed refit dates; the model used at close $t$ was fitted only on data before its refit date, which is at or before $t$.
+    \item The regime at close $t$ is the argmax of \emph{filtered} state probabilities from a causal forward pass over observations up to $t$. Smoothed (forward-backward) probabilities are never used out of sample, because smoothing conditions on future observations.
+    \item The mapping from state index to bullish/non-bullish is computed from the training window only, by the state-weighted mean of same-window daily returns. If no state has a positive mean return, the signal stays flat.
+    \item Like every other strategy in this report, the position is shifted by one day before it trades.
+\end{itemize}
+Assets with less history than the minimum training window (currently HYPE) remain flat and report an inactive HMM. The EM fit uses deterministic quantile-based initialization, so results are exactly reproducible without random seeds.
 
 \section{Formal Inference Versus Research Features}
 
@@ -135,6 +188,7 @@ Two-sided CSW excess & book-inspired curve applied symmetrically & heuristic & y
 SADF/QADF/CADF visual flags & full-sample top 5\% & no & no \\
 SADF/QADF/CADF critical exceedances & simulated random-walk finite-sample critical values & approximate & no, retrospective inference only \\
 SDFC & full-sample unknown-break scan & no in this report & no \\
+HMM regime filter & walk-forward Gaussian HMM, filtered (causal) state probabilities & no & yes \\
 Long/flat strategies & prior expanding thresholds plus one-day execution shift & no & yes \\
 \bottomrule
 \end{tabular}}
@@ -143,60 +197,60 @@ Long/flat strategies & prior expanding thresholds plus one-day execution shift &
 
 \section{How to Read the Plots}
 
-Each asset figure has five panels: price, BDE-inspired recursive CUSUM, two-sided CSW excess, ADF-family statistics, and SMT-style trend score. Orange shading marks \textbf{retrospective consensus alert periods}: at least two diagnostic families were in their full-sample top-alert region or exceeded the fixed CSW boundary. This shading is useful for visual structure clustering, but it is not an online trading signal.
+Each asset figure has six panels: price, BDE-inspired recursive CUSUM, two-sided CSW excess, ADF-family statistics, SMT-style trend score, and the filtered HMM regime state. Orange shading marks \textbf{retrospective consensus alert periods}: at least two diagnostic families were in their full-sample top-alert region or exceeded the fixed CSW boundary. This shading is useful for visual structure clustering, but it is not an online trading signal. In the HMM panel, green shading marks the days on which the filtered bull state was active; unlike the orange shading, this \emph{is} the online strategy state.
 
-The online strategy signals are separate. BDE, SADF, QADF, CADF, and SMT strategy events use prior expanding thresholds only. CSW strategy events use the current positive excess because the statistic already embeds its reference boundary.
+The online strategy signals are separate. BDE, SADF, QADF, CADF, and SMT strategy events use prior expanding thresholds only. CSW strategy events use the current positive excess because the statistic already embeds its reference boundary. The HMM strategy holds a long position exactly while the filtered bull state is active. The filtered HMM state per day is also stored in each asset's diagnostics CSV.
 
 \section{Results by Asset}
 
 \subsection{BTC}
 
-16 retrospective consensus alert run(s) were flagged on the daily clock. The first listed run begins on 2021-01-02. The SDFC candidate is 2018-12-16 with t-statistic 1.51. SADF peaks on 2021-01-08, the two-sided CSW heuristic peaks on 2020-03-12, and the SMT score peaks on 2025-10-09.
+16 retrospective consensus alert run(s) were flagged on the daily clock. The first listed run begins on 2021-01-02. The SDFC candidate is 2019-02-08 with t-statistic 1.38. SADF peaks on 2021-01-08, the two-sided CSW heuristic peaks on 2020-03-12, and the SMT score peaks on 2025-10-28. The walk-forward HMM covers 2862 daily observations from 2018-09-06 and spends 749 of them in its bull state.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{regime_chapter_figs/fig_asset_BTC.pdf}
-\caption{BTC structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal.}
+\caption{BTC structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal. Green shading in the bottom panel marks the filtered HMM bull state, which is the online HMM strategy state.}
 \end{figure}
 
 \subsection{ETH}
 
-20 retrospective consensus alert run(s) were flagged on the daily clock. The first listed run begins on 2021-01-04. The SDFC candidate is 2020-03-13 with t-statistic 0.99. SADF peaks on 2021-05-11, the two-sided CSW heuristic peaks on 2020-03-12, and the SMT score peaks on 2021-12-02.
+18 retrospective consensus alert run(s) were flagged on the daily clock. The first listed run begins on 2021-01-04. The SDFC candidate is 2020-03-13 with t-statistic 0.90. SADF peaks on 2021-05-11, the two-sided CSW heuristic peaks on 2020-03-12, and the SMT score peaks on 2021-12-09. The walk-forward HMM covers 2862 daily observations from 2018-09-06 and spends 762 of them in its bull state.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{regime_chapter_figs/fig_asset_ETH.pdf}
-\caption{ETH structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal.}
+\caption{ETH structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal. Green shading in the bottom panel marks the filtered HMM bull state, which is the online HMM strategy state.}
 \end{figure}
 
 \subsection{ETC}
 
-5 retrospective consensus alert run(s) were flagged on the daily clock. The first listed run begins on 2021-04-15. The SDFC candidate is none (non-positive t) with t-statistic -0.19. SADF peaks on 2021-05-06, the two-sided CSW heuristic peaks on 2020-03-12, and the SMT score peaks on 2021-11-03.
+6 retrospective consensus alert run(s) were flagged on the daily clock. The first listed run begins on 2021-04-15. The SDFC candidate is none (non-positive t) with t-statistic -0.26. SADF peaks on 2021-05-06, the two-sided CSW heuristic peaks on 2020-03-12, and the SMT score peaks on 2021-11-17. The walk-forward HMM covers 2563 daily observations from 2019-07-02 and spends 505 of them in its bull state.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{regime_chapter_figs/fig_asset_ETC.pdf}
-\caption{ETC structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal.}
+\caption{ETC structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal. Green shading in the bottom panel marks the filtered HMM bull state, which is the online HMM strategy state.}
 \end{figure}
 
 \subsection{SOL}
 
-9 retrospective consensus alert run(s) were flagged on the daily clock. The first listed run begins on 2021-09-07. The SDFC candidate is 2022-12-30 with t-statistic 0.62. SADF peaks on 2023-12-25, the two-sided CSW heuristic peaks on 2022-11-09, and the SMT score peaks on 2023-01-12.
+10 retrospective consensus alert run(s) were flagged on the daily clock. The first listed run begins on 2021-09-06. The SDFC candidate is 2022-12-30 with t-statistic 0.59. SADF peaks on 2023-12-25, the two-sided CSW heuristic peaks on 2022-11-09, and the SMT score peaks on 2022-01-04. The walk-forward HMM covers 1772 daily observations from 2021-08-31 and spends 257 of them in its bull state.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{regime_chapter_figs/fig_asset_SOL.pdf}
-\caption{SOL structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal.}
+\caption{SOL structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal. Green shading in the bottom panel marks the filtered HMM bull state, which is the online HMM strategy state.}
 \end{figure}
 
 \subsection{HYPE}
 
-5 retrospective consensus alert run(s) were flagged on the daily clock. The first listed run begins on 2025-12-18. The SDFC candidate is 2026-01-21 with t-statistic 1.44. SADF peaks on 2025-12-18, the two-sided CSW heuristic peaks on 2026-01-28, and the SMT score peaks on 2025-12-28. HYPE uses Binance USD-M futures price klines; strategy returns exclude funding, carry, basis, and futures-specific execution costs.
+7 retrospective consensus alert run(s) were flagged on the daily clock. The first listed run begins on 2025-12-18. The SDFC candidate is 2026-01-21 with t-statistic 1.71. SADF peaks on 2026-06-01, the two-sided CSW heuristic peaks on 2026-01-28, and the SMT score peaks on 2025-12-28. The walk-forward HMM covers 19 daily observations from 2026-06-19 and spends 1 of them in its bull state. HYPE uses Binance USD-M futures price klines; strategy returns exclude funding, carry, basis, and futures-specific execution costs.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{regime_chapter_figs/fig_asset_HYPE.pdf}
-\caption{HYPE structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal.}
+\caption{HYPE structural-break diagnostics. Orange shading is retrospective consensus, not an online trading signal. Green shading in the bottom panel marks the filtered HMM bull state, which is the online HMM strategy state.}
 \end{figure}
 
 \section{Consensus Alert Periods}
@@ -206,11 +260,11 @@ The table below lists the first few retrospective periods in which at least two 
 \begin{longtable}{@{}llll@{}}
 \caption{First listed retrospective consensus alert periods. Period length is counted in calendar days between the first and last daily alert observation. For assets with many daily runs, the table shows the first eight runs.}\\
 \toprule
-Asset & Start & End & Days/period length \\
+Asset & Start & End & Days \\
 \midrule
 \endfirsthead
 \toprule
-Asset & Start & End & Days/period length \\
+Asset & Start & End & Days \\
 \midrule
 \endhead
 BTC & 2021-01-02 & 2021-01-03 & 2 \\
@@ -221,7 +275,7 @@ BTC & 2021-01-02 & 2021-01-03 & 2 \\
  & 2021-02-17 & 2021-02-23 & 7 \\
  & 2021-03-01 & 2021-03-01 & 1 \\
  & 2021-03-11 & 2021-03-11 & 1 \\
-ETH & 2021-01-04 & 2021-01-10 & 7 \\
+ETH & 2021-01-04 & 2021-01-11 & 8 \\
  & 2021-01-14 & 2021-01-14 & 1 \\
  & 2021-01-16 & 2021-01-16 & 1 \\
  & 2021-01-19 & 2021-01-20 & 2 \\
@@ -232,21 +286,24 @@ ETH & 2021-01-04 & 2021-01-10 & 7 \\
 ETC & 2021-04-15 & 2021-06-11 & 58 \\
  & 2021-06-13 & 2021-06-14 & 2 \\
  & 2021-06-29 & 2021-06-30 & 2 \\
- & 2021-08-14 & 2021-12-23 & 132 \\
- & 2024-04-12 & 2024-04-12 & 1 \\
-SOL & 2021-09-07 & 2021-09-11 & 5 \\
- & 2021-11-13 & 2021-11-17 & 5 \\
+ & 2021-08-12 & 2021-09-09 & 29 \\
+ & 2021-09-15 & 2021-09-15 & 1 \\
+ & 2021-09-20 & 2021-12-20 & 92 \\
+SOL & 2021-09-06 & 2021-09-11 & 6 \\
+ & 2021-11-17 & 2021-11-17 & 1 \\
  & 2021-11-20 & 2021-11-21 & 2 \\
  & 2021-11-23 & 2021-11-23 & 1 \\
  & 2021-12-01 & 2021-12-02 & 2 \\
+ & 2022-01-22 & 2022-01-22 & 1 \\
  & 2023-01-03 & 2023-01-03 & 1 \\
  & 2023-01-14 & 2023-01-16 & 3 \\
- & 2023-01-20 & 2023-01-20 & 1 \\
 HYPE & 2025-12-18 & 2025-12-18 & 1 \\
- & 2025-12-23 & 2025-12-25 & 3 \\
- & 2026-01-01 & 2026-01-02 & 2 \\
- & 2026-01-20 & 2026-01-22 & 3 \\
- & 2026-01-26 & 2026-01-27 & 2 \\
+ & 2026-01-23 & 2026-01-26 & 4 \\
+ & 2026-05-21 & 2026-05-21 & 1 \\
+ & 2026-05-23 & 2026-05-25 & 3 \\
+ & 2026-05-30 & 2026-06-01 & 3 \\
+ & 2026-06-03 & 2026-06-04 & 2 \\
+ & 2026-06-16 & 2026-06-16 & 1 \\
 \bottomrule
 \end{longtable}
 
@@ -269,18 +326,18 @@ The table below compares each asset's observed ADF-family maxima with cached ran
 \toprule
 Asset & Sims & $\tau$ & SADF 95\% & Max SADF & SADF hits & QADF 95\% & Max QADF & QADF hits & CADF 95\% & Max CADF & CADF hits \\
 \midrule
-BTC & 2000 & 480 & 2.01 & 1.89 & 0 & 1.93 & 1.82 & 0 & 1.96 & 1.87 & 0 \\
-ETH & 2000 & 480 & 2.01 & 1.75 & 0 & 1.93 & 1.72 & 0 & 1.96 & 1.73 & 0 \\
-ETC & 2000 & 435 & 2.02 & 4.61 & 13 & 1.91 & 4.29 & 14 & 1.96 & 4.38 & 13 \\
-SOL & 2000 & 317 & 2.02 & 2.52 & 4 & 1.91 & 1.67 & 0 & 1.96 & 2.20 & 1 \\
-HYPE & 2000 & 60 & 1.98 & 0.46 & 0 & 1.89 & 0.32 & 0 & 1.94 & 0.41 & 0 \\
+BTC & 2000 & 488 & 2.02 & 1.89 & 0 & 1.92 & 1.82 & 0 & 1.96 & 1.86 & 0 \\
+ETH & 2000 & 488 & 2.02 & 1.75 & 0 & 1.92 & 1.72 & 0 & 1.96 & 1.73 & 0 \\
+ETC & 2000 & 443 & 2.01 & 4.48 & 13 & 1.90 & 4.28 & 14 & 1.95 & 4.32 & 13 \\
+SOL & 2000 & 324 & 2.05 & 2.52 & 4 & 1.94 & 1.61 & 0 & 1.99 & 2.07 & 1 \\
+HYPE & 2000 & 61 & 2.03 & 1.23 & 0 & 1.91 & 1.01 & 0 & 1.97 & 1.14 & 0 \\
 \bottomrule
 \end{tabular}}
 \caption{Simulated finite-sample critical values under random-walk null paths with matching sample length and $\tau$. Hits count daily observations above the 95\% simulated max-statistic threshold.}
 \end{table}
 
-\begin{longtable}{@{}lrrrrlr@{}}
-\caption{Sensitivity of selected results to the minimum-window fraction. ADF-family windows vary; BDE, CSW, and SMT inputs are held at their main-run definitions.}\\
+\begin{longtable}{@{}lrrcrlr@{}}
+\caption{Sensitivity of selected results to the minimum-window fraction. ADF-family windows vary; BDE, CSW, SMT, and HMM inputs are held at their main-run definitions.}\\
 \toprule
 Asset & $\tau$ rule & $\tau$ & Max SADF date & Runs & Best structure signal & Final \\
 \midrule
@@ -289,21 +346,21 @@ Asset & $\tau$ rule & $\tau$ & Max SADF date & Runs & Best structure signal & Fi
 Asset & $\tau$ rule & $\tau$ & Max SADF date & Runs & Best structure signal & Final \\
 \midrule
 \endhead
-BTC & 10\% & 320 & 2024-03-13 & 18 & CSW & 11.68x \\
-BTC & 15\% & 480 & 2021-01-08 & 16 & CSW & 11.68x \\
-BTC & 20\% & 640 & 2021-02-21 & 15 & CSW & 11.68x \\
-ETH & 10\% & 320 & 2024-03-11 & 23 & BDE & 9.35x \\
-ETH & 15\% & 480 & 2021-05-11 & 20 & BDE & 9.35x \\
-ETH & 20\% & 640 & 2021-05-11 & 20 & Consensus & 11.54x \\
-ETC & 10\% & 290 & 2021-05-06 & 13 & CSW & 11.44x \\
-ETC & 15\% & 435 & 2021-05-06 & 5 & CSW & 11.44x \\
-ETC & 20\% & 580 & 2021-05-06 & 5 & CSW & 11.44x \\
-SOL & 10\% & 211 & 2023-12-25 & 17 & CSW & 27.43x \\
-SOL & 15\% & 317 & 2023-12-25 & 9 & CSW & 27.43x \\
-SOL & 20\% & 422 & 2024-03-17 & 14 & CSW & 27.43x \\
-HYPE & 10\% & 60 & 2025-12-18 & 5 & BDE & 1.10x \\
-HYPE & 15\% & 60 & 2025-12-18 & 5 & BDE & 1.10x \\
-HYPE & 20\% & 71 & 2025-12-18 & 5 & BDE & 1.10x \\
+BTC & 10\% & 325 & 2024-03-13 & 19 & CSW & 11.68x \\
+BTC & 15\% & 488 & 2021-01-08 & 16 & CSW & 11.68x \\
+BTC & 20\% & 650 & 2021-02-21 & 15 & CSW & 11.68x \\
+ETH & 10\% & 325 & 2024-03-11 & 21 & BDE & 9.35x \\
+ETH & 15\% & 488 & 2021-05-11 & 18 & BDE & 9.35x \\
+ETH & 20\% & 650 & 2021-05-11 & 18 & BDE & 9.35x \\
+ETC & 10\% & 295 & 2021-05-06 & 14 & HMM & 20.48x \\
+ETC & 15\% & 443 & 2021-05-06 & 6 & HMM & 20.48x \\
+ETC & 20\% & 590 & 2021-05-06 & 6 & HMM & 20.48x \\
+SOL & 10\% & 216 & 2023-12-25 & 16 & CSW & 27.43x \\
+SOL & 15\% & 324 & 2023-12-25 & 10 & CSW & 27.43x \\
+SOL & 20\% & 432 & 2024-03-17 & 15 & CSW & 27.43x \\
+HYPE & 10\% & 60 & 2026-06-01 & 7 & CSW & 1.62x \\
+HYPE & 15\% & 61 & 2026-06-01 & 7 & CSW & 1.62x \\
+HYPE & 20\% & 81 & 2026-06-01 & 7 & CSW & 1.62x \\
 \bottomrule
 \end{longtable}
 
@@ -318,7 +375,7 @@ The diagnostics above are research features, not trading rules. Still, it is use
     \item Convert each eligible indicator into an online alert using prior expanding thresholds, except CSW, whose positive excess is already boundary-based.
     \item Require the trailing momentum gate to be positive.
     \item An alert computed at close $t$ sets exposure for the close $t$ to close $t+1$ return, assuming execution at or immediately after close $t$.
-    \item Keep the position long for the holding window after a valid alert, then move back out unless a new alert refreshes the holding window.
+    \item Keep the position long for the holding window after a valid alert, then move back out unless a new alert refreshes the holding window. The HMM strategy is the exception: it uses no momentum gate and no holding window, and instead stays long exactly while the filtered bull state is active.
     \item Charge transaction costs whenever exposure changes. Buy-and-hold is charged one entry cost for consistency.
 \end{enumerate}
 
@@ -333,11 +390,11 @@ This is still an in-sample comparison. The best final PnL is an indicative ranki
 \toprule
 Asset & Best structure signal & Best signal final & Buy-and-hold final & Best including buy-and-hold & Max DD & Exposure & Trades \\
 \midrule
-BTC & CSW & 11.68x & 17.95x & Buy-and-hold & -37\% & 17\% & 20 \\
-ETH & BDE & 9.35x & 7.05x & BDE & -61\% & 19\% & 7 \\
-ETC & CSW & 11.44x & 0.61x & CSW & -67\% & 26\% & 24 \\
-SOL & CSW & 27.43x & 25.86x & CSW & -60\% & 21\% & 9 \\
-HYPE & BDE & 1.10x & 1.45x & Buy-and-hold & -26\% & 12\% & 1 \\
+BTC & CSW & 11.68x & 14.77x & Buy-and-hold & -37\% & 17\% & 20 \\
+ETH & BDE & 9.35x & 5.86x & BDE & -61\% & 19\% & 7 \\
+ETC & HMM & 20.48x & 0.48x & HMM & -61\% & 17\% & 42 \\
+SOL & CSW & 27.43x & 24.40x & CSW & -60\% & 20\% & 9 \\
+HYPE & CSW & 1.62x & 2.11x & Buy-and-hold & -46\% & 46\% & 7 \\
 \bottomrule
 \end{tabular}}
 \caption{Best long/flat structure-break strategy by final equity multiple. Best structure signal excludes buy-and-hold; best including buy-and-hold includes it. Max DD, exposure, and trades refer to the best structure signal.}
@@ -384,7 +441,7 @@ HYPE & BDE & 1.10x & 1.45x & Buy-and-hold & -26\% & 12\% & 1 \\
 \subsection{Full Strategy Table}
 
 \begin{longtable}{@{}llrrrrrrr@{}}
-\caption{Simple long/flat strategy performance. Final multiple is the ending equity multiple from 1. CAGR is annualized over each asset's available sample. Sharpe uses daily returns and 365-day annualization.}\\
+\caption{Simple long/flat strategy performance. Final multiple is the ending equity multiple from 1. CAGR is annualized over each asset's available sample. Sharpe uses daily returns and 365-day annualization. Because Sharpe is computed from arithmetic daily means, a volatile asset can show a positive Sharpe while its compounded return is negative (volatility drag); ETC buy-and-hold is an example.}\\
 \toprule
 Asset & Strategy & Final & Total return & CAGR & Max DD & Sharpe & Exposure & Trades \\
 \midrule
@@ -393,52 +450,57 @@ Asset & Strategy & Final & Total return & CAGR & Max DD & Sharpe & Exposure & Tr
 Asset & Strategy & Final & Total return & CAGR & Max DD & Sharpe & Exposure & Trades \\
 \midrule
 \endhead
-BTC & Buy-and-hold & 17.95x & 1695\% & 39\% & -83\% & 0.83 & 100\% & 1 \\
+BTC & Buy-and-hold & 14.77x & 1377\% & 35\% & -83\% & 0.79 & 100\% & 1 \\
 BTC & BDE & 3.90x & 290\% & 17\% & -52\% & 0.62 & 17\% & 6 \\
-BTC & CSW & 11.68x & 1068\% & 32\% & -37\% & 1.00 & 17\% & 20 \\
-BTC & SADF & 3.32x & 232\% & 15\% & -31\% & 0.66 & 9\% & 5 \\
-BTC & QADF & 2.67x & 167\% & 12\% & -41\% & 0.56 & 11\% & 6 \\
-BTC & CADF & 3.16x & 216\% & 14\% & -30\% & 0.64 & 9\% & 5 \\
-BTC & SMT & 1.92x & 92\% & 8\% & -52\% & 0.41 & 25\% & 11 \\
-BTC & Consensus & 3.18x & 218\% & 14\% & -56\% & 0.56 & 14\% & 11 \\
-ETH & Buy-and-hold & 7.05x & 605\% & 25\% & -94\% & 0.70 & 100\% & 1 \\
-ETH & BDE & 9.35x & 835\% & 29\% & -61\% & 0.77 & 19\% & 7 \\
-ETH & CSW & 2.71x & 171\% & 12\% & -64\% & 0.48 & 18\% & 22 \\
-ETH & SADF & 3.38x & 238\% & 15\% & -52\% & 0.61 & 6\% & 2 \\
-ETH & QADF & 3.54x & 254\% & 16\% & -50\% & 0.63 & 5\% & 1 \\
-ETH & CADF & 3.78x & 278\% & 16\% & -50\% & 0.66 & 5\% & 1 \\
-ETH & SMT & 2.46x & 146\% & 11\% & -56\% & 0.49 & 10\% & 4 \\
-ETH & Consensus & 9.31x & 831\% & 29\% & -56\% & 0.78 & 15\% & 6 \\
-ETC & Buy-and-hold & 0.61x & -39\% & -6\% & -94\% & 0.43 & 100\% & 1 \\
-ETC & BDE & 1.44x & 44\% & 5\% & -74\% & 0.35 & 16\% & 7 \\
-ETC & CSW & 11.44x & 1044\% & 36\% & -67\% & 0.77 & 26\% & 24 \\
-ETC & SADF & 2.29x & 129\% & 11\% & -61\% & 0.44 & 5\% & 3 \\
-ETC & QADF & 2.13x & 113\% & 10\% & -61\% & 0.42 & 5\% & 3 \\
-ETC & CADF & 2.29x & 129\% & 11\% & -61\% & 0.44 & 5\% & 3 \\
-ETC & SMT & 0.45x & -55\% & -9\% & -67\% & -0.19 & 6\% & 5 \\
-ETC & Consensus & 1.05x & 5\% & 1\% & -79\% & 0.27 & 13\% & 10 \\
-SOL & Buy-and-hold & 25.86x & 2486\% & 76\% & -96\% & 1.06 & 100\% & 1 \\
-SOL & BDE & 5.19x & 419\% & 33\% & -89\% & 0.76 & 23\% & 6 \\
-SOL & CSW & 27.43x & 2643\% & 78\% & -60\% & 1.16 & 21\% & 9 \\
-SOL & SADF & 4.80x & 380\% & 31\% & -35\% & 0.94 & 9\% & 2 \\
-SOL & QADF & 4.20x & 320\% & 28\% & -35\% & 0.91 & 8\% & 2 \\
-SOL & CADF & 3.36x & 236\% & 23\% & -35\% & 0.78 & 9\% & 3 \\
-SOL & SMT & 4.11x & 311\% & 28\% & -40\% & 0.85 & 7\% & 2 \\
-SOL & Consensus & 24.86x & 2386\% & 75\% & -56\% & 1.20 & 15\% & 6 \\
-HYPE & Buy-and-hold & 1.45x & 45\% & 47\% & -64\% & 0.87 & 100\% & 1 \\
-HYPE & BDE & 1.10x & 10\% & 11\% & -26\% & 0.44 & 12\% & 1 \\
-HYPE & CSW & 1.09x & 9\% & 10\% & -46\% & 0.45 & 38\% & 7 \\
-HYPE & SADF & 1.00x & 0\% & 0\% & 0\% & n/a & 0\% & 0 \\
-HYPE & QADF & 1.00x & 0\% & 0\% & 0\% & n/a & 0\% & 0 \\
-HYPE & CADF & 1.00x & 0\% & 0\% & 0\% & n/a & 0\% & 0 \\
+BTC & CSW & 11.68x & 1068\% & 32\% & -37\% & 0.99 & 17\% & 20 \\
+BTC & SADF & 3.80x & 280\% & 16\% & -31\% & 0.72 & 10\% & 5 \\
+BTC & QADF & 2.92x & 192\% & 13\% & -36\% & 0.60 & 11\% & 6 \\
+BTC & CADF & 2.87x & 187\% & 13\% & -41\% & 0.59 & 10\% & 6 \\
+BTC & SMT & 1.76x & 76\% & 7\% & -57\% & 0.37 & 26\% & 11 \\
+BTC & HMM & 2.76x & 176\% & 12\% & -41\% & 0.53 & 23\% & 56 \\
+BTC & Consensus & 3.31x & 231\% & 14\% & -60\% & 0.57 & 15\% & 12 \\
+ETH & Buy-and-hold & 5.86x & 486\% & 22\% & -94\% & 0.67 & 100\% & 1 \\
+ETH & BDE & 9.35x & 835\% & 29\% & -61\% & 0.76 & 19\% & 7 \\
+ETH & CSW & 2.71x & 171\% & 12\% & -64\% & 0.47 & 18\% & 22 \\
+ETH & SADF & 3.60x & 260\% & 16\% & -52\% & 0.62 & 6\% & 2 \\
+ETH & QADF & 3.78x & 278\% & 16\% & -50\% & 0.65 & 5\% & 1 \\
+ETH & CADF & 3.96x & 296\% & 17\% & -50\% & 0.67 & 5\% & 1 \\
+ETH & SMT & 1.61x & 61\% & 6\% & -56\% & 0.33 & 11\% & 5 \\
+ETH & HMM & 8.16x & 716\% & 27\% & -50\% & 0.75 & 23\% & 47 \\
+ETH & Consensus & 6.24x & 524\% & 23\% & -56\% & 0.68 & 16\% & 7 \\
+ETC & Buy-and-hold & 0.48x & -52\% & -9\% & -95\% & 0.40 & 100\% & 1 \\
+ETC & BDE & 1.44x & 44\% & 5\% & -74\% & 0.34 & 15\% & 7 \\
+ETC & CSW & 11.44x & 1044\% & 35\% & -67\% & 0.77 & 25\% & 24 \\
+ETC & SADF & 2.13x & 113\% & 10\% & -61\% & 0.42 & 5\% & 3 \\
+ETC & QADF & 2.14x & 114\% & 10\% & -61\% & 0.42 & 5\% & 3 \\
+ETC & CADF & 2.13x & 113\% & 10\% & -61\% & 0.42 & 5\% & 3 \\
+ETC & SMT & 0.70x & -30\% & -4\% & -84\% & 0.10 & 8\% & 6 \\
+ETC & HMM & 20.48x & 1948\% & 45\% & -61\% & 0.89 & 17\% & 42 \\
+ETC & Consensus & 1.00x & 0\% & 0\% & -78\% & 0.25 & 13\% & 10 \\
+SOL & Buy-and-hold & 24.40x & 2340\% & 72\% & -96\% & 1.04 & 100\% & 1 \\
+SOL & BDE & 5.19x & 419\% & 32\% & -89\% & 0.75 & 22\% & 6 \\
+SOL & CSW & 27.43x & 2643\% & 75\% & -60\% & 1.14 & 20\% & 9 \\
+SOL & SADF & 2.96x & 196\% & 20\% & -35\% & 0.72 & 9\% & 3 \\
+SOL & QADF & 2.62x & 162\% & 18\% & -35\% & 0.69 & 7\% & 2 \\
+SOL & CADF & 2.68x & 168\% & 18\% & -35\% & 0.67 & 9\% & 3 \\
+SOL & SMT & 0.81x & -19\% & -3\% & -67\% & 0.03 & 7\% & 2 \\
+SOL & HMM & 3.72x & 272\% & 25\% & -44\% & 0.74 & 12\% & 18 \\
+SOL & Consensus & 9.45x & 845\% & 46\% & -56\% & 0.94 & 14\% & 6 \\
+HYPE & Buy-and-hold & 2.11x & 111\% & 96\% & -64\% & 1.17 & 100\% & 1 \\
+HYPE & BDE & 1.19x & 19\% & 17\% & -26\% & 0.58 & 13\% & 2 \\
+HYPE & CSW & 1.62x & 62\% & 55\% & -46\% & 0.99 & 46\% & 7 \\
+HYPE & SADF & 1.26x & 26\% & 23\% & -29\% & 0.75 & 12\% & 1 \\
+HYPE & QADF & 1.26x & 26\% & 23\% & -29\% & 0.75 & 12\% & 1 \\
+HYPE & CADF & 1.26x & 26\% & 23\% & -29\% & 0.75 & 12\% & 1 \\
 HYPE & SMT & 1.00x & 0\% & 0\% & 0\% & n/a & 0\% & 0 \\
-HYPE & Consensus & 1.01x & 1\% & 1\% & -19\% & 0.18 & 6\% & 1 \\
+HYPE & HMM & 0.96x & -4\% & -4\% & -4\% & -0.97 & 0\% & 1 \\
+HYPE & Consensus & 1.30x & 30\% & 27\% & -29\% & 0.76 & 17\% & 2 \\
 \bottomrule
 \end{longtable}
 
 \subsection{Walk-Forward and Multiple-Testing Checks}
 
-The walk-forward check selects the best structure signal on an expanding training window and evaluates only the next out-of-sample block. This does not prove profitability, but it reduces the most obvious winner-picking bias in the in-sample table.
+The walk-forward check selects the best structure signal on an expanding training window and evaluates only the next out-of-sample block. This does not prove profitability, but it reduces the most obvious winner-picking bias in the in-sample table. In the selected-signal path, repeated selections are compressed, so ``CSW x6'' means CSW was chosen for six consecutive blocks.
 
 \begin{table}[H]
 \centering
@@ -449,11 +511,11 @@ The walk-forward check selects the best structure signal on an expanding trainin
 \toprule
 Asset & Blocks & OOS days & Selected signal path & OOS final & OOS Sharpe & OOS Max DD \\
 \midrule
-BTC & 13 & 2340 & CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW & 5.45x & 1.08 & -29\% \\
-ETH & 13 & 2340 & BDE, BDE, BDE, BDE, BDE, BDE, BDE, BDE, BDE, BDE, BDE, BDE, BDE & 5.36x & 0.79 & -61\% \\
-ETC & 12 & 2160 & CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW & 4.58x & 0.69 & -67\% \\
-SOL & 7 & 1260 & CSW, CSW, CSW, CSW, CSW, CSW, CSW & 0.59x & -0.35 & -46\% \\
-HYPE & 0 & 0 &  & n/a & n/a & n/a \\
+BTC & 13 & 2340 & CSW x13 & 5.45x & 1.08 & -29\% \\
+ETH & 13 & 2340 & BDE x13 & 5.36x & 0.79 & -61\% \\
+ETC & 12 & 2160 & CSW x6, HMM, CSW x2, HMM x3 & 6.45x & 0.78 & -61\% \\
+SOL & 7 & 1260 & CSW x7 & 0.59x & -0.35 & -46\% \\
+HYPE & 0 & 0 & n/a & n/a & n/a & n/a \\
 \bottomrule
 \end{tabular}}
 \caption{Expanding-window walk-forward validation of signal selection. HYPE has too little history for the default train/test split and may show no blocks.}
@@ -468,21 +530,23 @@ HYPE & 0 & 0 &  & n/a & n/a & n/a \\
 \toprule
 Asset & Bootstrap sims & Best signal & Best final & Final 5--95\% CI & Sharpe 5--95\% CI & Reality-check $p$ \\
 \midrule
-BTC & 500 & CSW & 11.68x & [2.33x, 87.12x] & [0.48, 1.59] & 0.956 \\
-ETH & 500 & BDE & 9.35x & [1.02x, 138.62x] & [0.24, 1.34] & 0.918 \\
-ETC & 500 & CSW & 11.44x & [0.55x, 378.68x] & [0.13, 1.35] & 0.590 \\
-SOL & 500 & CSW & 27.43x & [1.56x, 759.32x] & [0.45, 1.86] & 0.958 \\
-HYPE & 500 & BDE & 1.10x & [0.67x, 1.97x] & [-1.57, 1.46] & 0.898 \\
+BTC & 500 & CSW & 11.68x & [2.53x, 83.04x] & [0.49, 1.56] & 0.946 \\
+ETH & 500 & BDE & 9.35x & [0.96x, 81.09x] & [0.21, 1.23] & 0.908 \\
+ETC & 500 & HMM & 20.48x & [1.11x, 480.46x] & [0.27, 1.44] & 0.512 \\
+SOL & 500 & CSW & 27.43x & [1.77x, 637.25x] & [0.45, 1.81] & 0.958 \\
+HYPE & 500 & CSW & 1.62x & [0.61x, 4.16x] & [-0.38, 2.31] & 0.910 \\
 \bottomrule
 \end{tabular}}
 \caption{Block-bootstrap uncertainty for the best in-sample structure signal and a simple centered bootstrap reality-check p-value for best excess mean return versus buy-and-hold.}
 \end{table}
 
+The reality-check p-value estimates how often a resampled, mean-centered version of the signal family would produce a best mean daily excess return over buy-and-hold at least as large as the one observed, after accounting for the fact that the best of several signals was selected. Values near 1 mean the observed outperformance is entirely consistent with luck; only small values (for example below 0.05) would count as evidence of skill. Readers should check the table rather than assume the headline equity multiples imply significance.
+
 \section{Interpretation}
 
 Methodologically, SADF is a strong default diagnostic for repeated explosive episodes because it does not require the analyst to know the number or timing of regime switches. Empirically, in this particular in-sample long/flat conversion, the winning signal can differ by asset and must be treated as selected after looking at many alternatives.
 
-The most important traps are multiple testing, listing-history differences, simplified zero-lag ADF regressions, and price-only data. HYPE is especially limited because it uses futures price klines without funding-rate adjustment. Regime-change diagnostics are best read as feature-engineering tools, not as a recipe for direct trading.
+The most important traps are multiple testing, listing-history differences, simplified zero-lag ADF regressions, and price-only data. HYPE is especially limited because it uses futures price klines without funding-rate adjustment. The HMM adds a complementary latent-state view, but its in-sample equity multiples share the same selection caveats, and its output is sensitive to the number of states and the refit schedule. Regime-change diagnostics are best read as feature-engineering tools, not as a recipe for direct trading.
 
 \section{Minimal Reproducibility Sketch}
 
@@ -491,6 +555,9 @@ The most important traps are multiple testing, listing-history differences, simp
 event_t = signal_at_close_t
 position = event_t.rolling(hold_days).max().shift(1)
 strategy_return_t = position_t * close.pct_change_t - costs_t
+
+# HMM variant: no hold window, position tracks the filtered bull state
+position_hmm = (filtered_state_at_close_t == bull_state).shift(1)
 \end{lstlisting}
 
 \section{Reproduce}
@@ -506,7 +573,13 @@ The generator writes daily diagnostics, strategy PnL CSVs, cached calibration fi
 \section{References}
 
 \begin{itemize}
-    \item Marcos L\'opez de Prado, \emph{Advances in Financial Machine Learning}, Wiley, 2018, structural-break methods.
+    \item Marcos L\'opez de Prado, \emph{Advances in Financial Machine Learning}, Wiley, 2018, structural-break methods (Chapter 17).
+    \item \'Alvaro Cartea, Sebastian Jaimungal, and Jos\'e Penalva, \emph{Algorithmic and High-Frequency Trading}, Cambridge University Press, 2015, Markov-chain regime models for order flow (Chapter 12), motivating the latent-regime view used by the HMM filter.
+    \item R.~L.~Brown, J.~Durbin, and J.~M.~Evans, ``Techniques for testing the constancy of regression relationships over time,'' \emph{Journal of the Royal Statistical Society B}, 37(2), 1975.
+    \item C.-S.~J.~Chu, M.~Stinchcombe, and H.~White, ``Monitoring structural change,'' \emph{Econometrica}, 64(5), 1996; and U.~Homm and J.~Breitung, ``Testing for speculative bubbles in stock markets,'' \emph{Journal of Financial Econometrics}, 10(1), 2012.
+    \item G.~C.~Chow, ``Tests of equality between sets of coefficients in two linear regressions,'' \emph{Econometrica}, 28(3), 1960.
+    \item P.~C.~B.~Phillips, Y.~Wu, and J.~Yu, ``Explosive behavior in the 1990s Nasdaq: When did exuberance escalate asset values?'' \emph{International Economic Review}, 52(1), 2011.
+    \item J.~D.~Hamilton, ``A new approach to the economic analysis of nonstationary time series and the business cycle,'' \emph{Econometrica}, 57(2), 1989, the canonical Markov-switching regime model.
     \item Binance API daily kline endpoints for BTCUSDT, ETHUSDT, ETCUSDT, SOLUSDT spot, and HYPEUSDT USD-M futures fallback.
     \item Local reproduction script: \texttt{scripts/generate\_daily\_regime\_chapter.py}.
 \end{itemize}

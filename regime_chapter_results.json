@@ -1,6 +1,6 @@
 {
-  "generated_at_utc": "2026-05-19T13:49:21.510252+00:00",
-  "last_closed_day": "2026-05-18",
+  "generated_at_utc": "2026-07-08T15:19:57.920000+00:00",
+  "last_closed_day": "2026-07-07",
   "config": {
     "assets": [
       "BTC",
@@ -21,8 +21,11 @@
     "bootstrap_seed": 777,
     "walk_forward_train_min": 730,
     "walk_forward_test_size": 180,
-    "use_cache": true,
-    "skip_download": true,
+    "hmm_states": 3,
+    "hmm_refit_days": 126,
+    "hmm_min_history": 365,
+    "use_cache": false,
+    "skip_download": false,
     "workers": 8
   },
   "assets": {
@@ -32,27 +35,35 @@
       "market": "spot",
       "source": "Binance spot",
       "reason": "spot is available and has the longest Binance spot history requested",
-      "spot_status": "not checked (--skip-download)",
-      "futures_status": "not checked (--skip-download)",
+      "spot_status": "TRADING, spotAllowed=True",
+      "futures_status": "TRADING",
       "raw_start": "2017-08-17",
-      "raw_end": "2026-05-18",
-      "raw_rows": 3197,
-      "close_file": "data/binance_daily/BTC_BTCUSDT_spot_1d.csv",
+      "raw_end": "2026-07-07",
+      "raw_rows": 3247,
+      "close_file": "data\\binance_daily\\BTC_BTCUSDT_spot_1d.csv",
       "clock": "daily close",
-      "test_rows": 3197,
-      "tau": 480,
+      "test_rows": 3247,
+      "tau": 488,
       "tau_fraction": 0.15,
-      "diagnostics_file": "data/binance_daily/BTC_diagnostics_daily.csv",
-      "sdfc_t": 1.5133903936392785,
-      "sdfc_candidate": "2018-12-16",
+      "diagnostics_file": "data\\binance_daily\\BTC_diagnostics_daily.csv",
+      "sdfc_t": 1.37917941351609,
+      "sdfc_candidate": "2019-02-08",
       "max_sadf": "2021-01-08",
       "max_sadf_value": 1.8864368362674122,
-      "max_qadf_value": 1.8206775095897927,
-      "max_cadf_value": 1.8721282041651408,
+      "max_qadf_value": 1.8162457531734448,
+      "max_cadf_value": 1.8612219428157033,
       "max_csw": "2020-03-12",
       "max_csw_value": 8.89229170229624,
-      "max_smt": "2025-10-09",
-      "max_smt_value": 4.171005666572379,
+      "max_smt": "2025-10-28",
+      "max_smt_value": 4.348920119849646,
+      "hmm": {
+        "states": 3,
+        "refit_days": 126,
+        "min_history": 365,
+        "modeled_days": 2862,
+        "bull_days": 749,
+        "first_modeled_day": "2018-09-06"
+      },
       "runs": [
         {
           "start": "2021-01-02",
@@ -137,24 +148,27 @@
       ],
       "run_count": 16,
       "first_run": "2021-01-02",
-      "strategy_file": "data/binance_daily/BTC_strategy_daily.csv",
+      "strategy_file": "data\\binance_daily\\BTC_strategy_daily.csv",
       "strategies": {
-        "strategy_file": "data/binance_daily/BTC_strategy_daily.csv",
+        "strategy_file": "data\\binance_daily\\BTC_strategy_daily.csv",
         "parameters": {
           "transaction_cost": 0.001,
           "signal_quantile": 0.95,
           "signal_min_history": 60,
           "momentum_days": 20,
           "hold_days": 20,
+          "hmm_states": 3,
+          "hmm_refit_days": 126,
+          "hmm_min_history": 365,
           "buyhold_entry_cost_charged": true
         },
         "metrics": {
           "BuyHold": {
-            "final_multiple": 17.951792762328903,
-            "total_return": 16.951792762328903,
-            "cagr": 0.3909893531305446,
+            "final_multiple": 14.772332374191459,
+            "total_return": 13.772332374191459,
+            "cagr": 0.353910763877902,
             "max_drawdown": -0.8318705353076483,
-            "sharpe": 0.8297876743981859,
+            "sharpe": 0.7904277743090169,
             "exposure": 1.0,
             "trades": 1,
             "turnover": 1.0
@@ -162,78 +176,88 @@
           "BDE": {
             "final_multiple": 3.8974117106235946,
             "total_return": 2.8974117106235946,
-            "cagr": 0.16819668486014439,
+            "cagr": 0.16540259888641917,
             "max_drawdown": -0.5236843029402292,
-            "sharpe": 0.6223010242644076,
-            "exposure": 0.17485142320925867,
+            "sharpe": 0.6174860376226743,
+            "exposure": 0.1721589159223899,
             "trades": 6,
             "turnover": 12.0
           },
           "CSW": {
             "final_multiple": 11.682211507192566,
             "total_return": 10.682211507192566,
-            "cagr": 0.32434299497731667,
+            "cagr": 0.3186247875120052,
             "max_drawdown": -0.374640295535009,
-            "sharpe": 0.9992990211872859,
-            "exposure": 0.17234907725993118,
+            "sharpe": 0.991554266881802,
+            "exposure": 0.1696951031721589,
             "trades": 20,
             "turnover": 40.0
           },
           "SADF": {
-            "final_multiple": 3.322637763296031,
-            "total_return": 2.322637763296031,
-            "cagr": 0.14708840879612017,
-            "max_drawdown": -0.3113475300608085,
-            "sharpe": 0.6644541533228946,
-            "exposure": 0.0925868001251173,
+            "final_multiple": 3.8035047185452835,
+            "total_return": 2.8035047185452835,
+            "cagr": 0.16220864287881276,
+            "max_drawdown": -0.3056019304553357,
+            "sharpe": 0.7163192878502176,
+            "exposure": 0.09670465044656607,
             "trades": 5,
             "turnover": 10.0
           },
           "QADF": {
-            "final_multiple": 2.6723768440379345,
-            "total_return": 1.6723768440379345,
-            "cagr": 0.11888990232751184,
-            "max_drawdown": -0.4059448869006119,
-            "sharpe": 0.5634868282868518,
-            "exposure": 0.1054113231154207,
+            "final_multiple": 2.923578549500297,
+            "total_return": 1.9235785495002968,
+            "cagr": 0.12830412628844967,
+            "max_drawdown": -0.3640787460909808,
+            "sharpe": 0.5962262297559714,
+            "exposure": 0.10563597166615338,
             "trades": 6,
             "turnover": 12.0
           },
           "CADF": {
-            "final_multiple": 3.160007554516598,
-            "total_return": 2.160007554516598,
-            "cagr": 0.14052838172674353,
-            "max_drawdown": -0.2956454238152848,
-            "sharpe": 0.6436946135136522,
-            "exposure": 0.09196121363778542,
-            "trades": 5,
-            "turnover": 10.0
+            "final_multiple": 2.8658588335503192,
+            "total_return": 1.8658588335503192,
+            "cagr": 0.1257753351395512,
+            "max_drawdown": -0.41434223942463255,
+            "sharpe": 0.5892187786545126,
+            "exposure": 0.10101632275947028,
+            "trades": 6,
+            "turnover": 12.0
           },
           "SMT": {
-            "final_multiple": 1.9234374663477762,
-            "total_return": 0.9234374663477762,
-            "cagr": 0.07761947236912659,
-            "max_drawdown": -0.516030781132106,
-            "sharpe": 0.4116624160787666,
-            "exposure": 0.25336252736940884,
+            "final_multiple": 1.762952282221862,
+            "total_return": 0.762952282221862,
+            "cagr": 0.06587862298533453,
+            "max_drawdown": -0.5734946592773082,
+            "sharpe": 0.36959022816978115,
+            "exposure": 0.2605481983369264,
             "trades": 11,
             "turnover": 22.0
           },
           "Consensus": {
-            "final_multiple": 3.179220592034644,
-            "total_return": 2.179220592034644,
-            "cagr": 0.14131875266292537,
-            "max_drawdown": -0.5592411525775758,
-            "sharpe": 0.5612756242697956,
-            "exposure": 0.13825461370034406,
-            "trades": 11,
-            "turnover": 22.0
+            "final_multiple": 3.3131824657986875,
+            "total_return": 2.3131824657986875,
+            "cagr": 0.14429927508765572,
+            "max_drawdown": -0.5985080415422335,
+            "sharpe": 0.5689270237182079,
+            "exposure": 0.1484447182014167,
+            "trades": 12,
+            "turnover": 24.0
+          },
+          "HMM": {
+            "final_multiple": 2.7559467736765866,
+            "total_return": 1.7559467736765866,
+            "cagr": 0.12083230672094047,
+            "max_drawdown": -0.4108281628306669,
+            "sharpe": 0.5276924444172826,
+            "exposure": 0.23067446874037573,
+            "trades": 56,
+            "turnover": 112.0
           }
         },
         "best_signal_strategy": "CSW",
         "best_signal_final_multiple": 11.682211507192566,
         "best_including_buyhold": "BuyHold",
-        "best_including_buyhold_final_multiple": 17.951792762328903,
+        "best_including_buyhold_final_multiple": 14.772332374191459,
         "walk_forward": {
           "blocks": [
             {
@@ -373,30 +397,30 @@
           "block_size": 20,
           "best_signal": "CSW",
           "best_signal_final_multiple": 11.682211507192566,
-          "best_signal_final_ci_05": 2.330344904572114,
-          "best_signal_final_ci_95": 87.12239943385133,
-          "best_signal_sharpe_ci_05": 0.4774809840308674,
-          "best_signal_sharpe_ci_95": 1.5903194806441179,
-          "observed_best_daily_excess_mean": -0.000617405214941383,
-          "reality_check_p_value": 0.956
+          "best_signal_final_ci_05": 2.5264992049741535,
+          "best_signal_final_ci_95": 83.03901295773998,
+          "best_signal_sharpe_ci_05": 0.49407056901992386,
+          "best_signal_sharpe_ci_95": 1.5589634184792474,
+          "observed_best_daily_excess_mean": -0.0005510644903564279,
+          "reality_check_p_value": 0.946
         }
       },
       "calibration": {
         "version": "adf_zero_lag_v2",
-        "n": 3197,
-        "tau": 480,
+        "n": 3247,
+        "tau": 488,
         "sims": 2000,
         "seed": 123,
         "critical_values": {
-          "sadf_90": 1.7778130935695977,
-          "sadf_95": 2.0068816385361026,
-          "sadf_99": 2.4997957883810655,
-          "qadf_90": 1.67900145143427,
-          "qadf_95": 1.9295614692696428,
-          "qadf_99": 2.360048131241967,
-          "cadf_90": 1.7319906887023186,
-          "cadf_95": 1.9590938676772298,
-          "cadf_99": 2.473986030685405
+          "sadf_90": 1.802745954045438,
+          "sadf_95": 2.021008066500551,
+          "sadf_99": 2.5028156558587007,
+          "qadf_90": 1.7038929652752919,
+          "qadf_95": 1.9166081555022103,
+          "qadf_99": 2.420668531877266,
+          "cadf_90": 1.7499807460005559,
+          "cadf_95": 1.9632709626224694,
+          "cadf_99": 2.485433130399416
         }
       },
       "critical_exceedances": {
@@ -407,15 +431,15 @@
       "tau_sensitivity": [
         {
           "tau_fraction": 0.1,
-          "tau": 320,
+          "tau": 325,
           "max_sadf_date": "2024-03-13",
-          "run_count": 18,
+          "run_count": 19,
           "best_signal_strategy": "CSW",
           "best_signal_final_multiple": 11.682211507192566
         },
         {
           "tau_fraction": 0.15,
-          "tau": 480,
+          "tau": 488,
           "max_sadf_date": "2021-01-08",
           "run_count": 16,
           "best_signal_strategy": "CSW",
@@ -423,7 +447,7 @@
         },
         {
           "tau_fraction": 0.2,
-          "tau": 640,
+          "tau": 650,
           "max_sadf_date": "2021-02-21",
           "run_count": 15,
           "best_signal_strategy": "CSW",
@@ -437,32 +461,40 @@
       "market": "spot",
       "source": "Binance spot",
       "reason": "spot is available and has the longest Binance spot history requested",
-      "spot_status": "not checked (--skip-download)",
-      "futures_status": "not checked (--skip-download)",
+      "spot_status": "TRADING, spotAllowed=True",
+      "futures_status": "TRADING",
       "raw_start": "2017-08-17",
-      "raw_end": "2026-05-18",
-      "raw_rows": 3197,
-      "close_file": "data/binance_daily/ETH_ETHUSDT_spot_1d.csv",
+      "raw_end": "2026-07-07",
+      "raw_rows": 3247,
+      "close_file": "data\\binance_daily\\ETH_ETHUSDT_spot_1d.csv",
       "clock": "daily close",
-      "test_rows": 3197,
-      "tau": 480,
+      "test_rows": 3247,
+      "tau": 488,
       "tau_fraction": 0.15,
-      "diagnostics_file": "data/binance_daily/ETH_diagnostics_daily.csv",
-      "sdfc_t": 0.9925121458195265,
+      "diagnostics_file": "data\\binance_daily\\ETH_diagnostics_daily.csv",
+      "sdfc_t": 0.9013025720342442,
       "sdfc_candidate": "2020-03-13",
       "max_sadf": "2021-05-11",
       "max_sadf_value": 1.750438316173867,
-      "max_qadf_value": 1.7233341385811165,
-      "max_cadf_value": 1.7325159726230592,
+      "max_qadf_value": 1.7235014578521122,
+      "max_cadf_value": 1.7327232724258346,
       "max_csw": "2020-03-12",
       "max_csw_value": 8.425134344974126,
-      "max_smt": "2021-12-02",
-      "max_smt_value": 4.161818422149577,
+      "max_smt": "2021-12-09",
+      "max_smt_value": 4.472932395295842,
+      "hmm": {
+        "states": 3,
+        "refit_days": 126,
+        "min_history": 365,
+        "modeled_days": 2862,
+        "bull_days": 762,
+        "first_modeled_day": "2018-09-06"
+      },
       "runs": [
         {
           "start": "2021-01-04",
-          "end": "2021-01-10",
-          "days": 7
+          "end": "2021-01-11",
+          "days": 8
         },
         {
           "start": "2021-01-14",
@@ -540,46 +572,39 @@
           "days": 1
         },
         {
-          "start": "2021-09-04",
-          "end": "2021-09-07",
-          "days": 4
-        },
-        {
           "start": "2021-09-21",
           "end": "2021-09-21",
           "days": 1
         },
         {
-          "start": "2021-11-04",
-          "end": "2022-01-02",
-          "days": 60
-        },
-        {
-          "start": "2022-01-21",
-          "end": "2022-01-22",
-          "days": 2
+          "start": "2021-11-03",
+          "end": "2022-01-24",
+          "days": 83
         }
       ],
-      "run_count": 20,
+      "run_count": 18,
       "first_run": "2021-01-04",
-      "strategy_file": "data/binance_daily/ETH_strategy_daily.csv",
+      "strategy_file": "data\\binance_daily\\ETH_strategy_daily.csv",
       "strategies": {
-        "strategy_file": "data/binance_daily/ETH_strategy_daily.csv",
+        "strategy_file": "data\\binance_daily\\ETH_strategy_daily.csv",
         "parameters": {
           "transaction_cost": 0.001,
           "signal_quantile": 0.95,
           "signal_min_history": 60,
           "momentum_days": 20,
           "hold_days": 20,
+          "hmm_states": 3,
+          "hmm_refit_days": 126,
+          "hmm_min_history": 365,
           "buyhold_entry_cost_charged": true
         },
         "metrics": {
           "BuyHold": {
-            "final_multiple": 7.046191788079451,
-            "total_return": 6.046191788079451,
-            "cagr": 0.24999186327368994,
+            "final_multiple": 5.859862748344358,
+            "total_return": 4.859862748344358,
+            "cagr": 0.22012711826318232,
             "max_drawdown": -0.9396550481981527,
-            "sharpe": 0.6980004576251521,
+            "sharpe": 0.6693360233515583,
             "exposure": 1.0,
             "trades": 1,
             "turnover": 1.0
@@ -587,72 +612,82 @@
           "BDE": {
             "final_multiple": 9.347033665946277,
             "total_return": 8.347033665946277,
-            "cagr": 0.2910170562202752,
+            "cagr": 0.28594747800675346,
             "max_drawdown": -0.607133850263603,
-            "sharpe": 0.7659693852831224,
-            "exposure": 0.1911166718798874,
+            "sharpe": 0.7600395826588398,
+            "exposure": 0.1881736987988913,
             "trades": 7,
             "turnover": 14.0
           },
           "CSW": {
             "final_multiple": 2.709464808037674,
             "total_return": 1.7094648080376742,
-            "cagr": 0.12065371249234258,
+            "cagr": 0.11868907625659975,
             "max_drawdown": -0.6424508176811111,
-            "sharpe": 0.47840002763009354,
-            "exposure": 0.18360963403190492,
+            "sharpe": 0.47470004536169325,
+            "exposure": 0.18078226054819835,
             "trades": 22,
             "turnover": 44.0
           },
           "SADF": {
-            "final_multiple": 3.37952464002357,
-            "total_return": 2.37952464002357,
-            "cagr": 0.14931601934637673,
+            "final_multiple": 3.6023680005123317,
+            "total_return": 2.6023680005123317,
+            "cagr": 0.15512509438377475,
             "max_drawdown": -0.5183508278565108,
-            "sharpe": 0.6071567091482012,
-            "exposure": 0.0569283703472005,
+            "sharpe": 0.622165520507695,
+            "exposure": 0.05913150600554358,
             "trades": 2,
             "turnover": 4.0
           },
           "QADF": {
-            "final_multiple": 3.541674014173228,
-            "total_return": 2.541674014173228,
-            "cagr": 0.1554880755261645,
+            "final_multiple": 3.776078425555142,
+            "total_return": 2.776078425555142,
+            "cagr": 0.16126261774364936,
             "max_drawdown": -0.49768417017096167,
-            "sharpe": 0.6337632618522087,
-            "exposure": 0.050359712230215826,
+            "sharpe": 0.6523161711054564,
+            "exposure": 0.04989220819217739,
             "trades": 1,
             "turnover": 2.0
           },
           "CADF": {
-            "final_multiple": 3.776078425555142,
-            "total_return": 2.776078425555142,
-            "cagr": 0.16398197180341811,
+            "final_multiple": 3.9563889899030595,
+            "total_return": 2.9563889899030595,
+            "cagr": 0.1673737854815427,
             "max_drawdown": -0.49768417017096167,
-            "sharpe": 0.6574033764922061,
-            "exposure": 0.05067250547388177,
+            "sharpe": 0.6652606877440428,
+            "exposure": 0.05266399753618725,
             "trades": 1,
             "turnover": 2.0
           },
           "SMT": {
-            "final_multiple": 2.4620639206398343,
-            "total_return": 1.4620639206398343,
-            "cagr": 0.10845750504018792,
-            "max_drawdown": -0.5565288651739108,
-            "sharpe": 0.48569747535258134,
-            "exposure": 0.1010322177040976,
-            "trades": 4,
-            "turnover": 8.0
+            "final_multiple": 1.6104447579740448,
+            "total_return": 0.6104447579740448,
+            "cagr": 0.05508193624376734,
+            "max_drawdown": -0.5565288651739104,
+            "sharpe": 0.3285563203983578,
+            "exposure": 0.10502001847859563,
+            "trades": 5,
+            "turnover": 10.0
           },
           "Consensus": {
-            "final_multiple": 9.306956564318593,
-            "total_return": 8.306956564318593,
-            "cagr": 0.29038323900686747,
-            "max_drawdown": -0.5565288651739106,
-            "sharpe": 0.7846151320804676,
-            "exposure": 0.15483265561463871,
-            "trades": 6,
-            "turnover": 12.0
+            "final_multiple": 6.238369198619902,
+            "total_return": 5.238369198619902,
+            "cagr": 0.22875094877550906,
+            "max_drawdown": -0.5565288651739104,
+            "sharpe": 0.6760111143843727,
+            "exposure": 0.16168771173390822,
+            "trades": 7,
+            "turnover": 14.0
+          },
+          "HMM": {
+            "final_multiple": 8.164158038507312,
+            "total_return": 7.164158038507312,
+            "cagr": 0.26651723137145056,
+            "max_drawdown": -0.4997907270842018,
+            "sharpe": 0.7532142688940308,
+            "exposure": 0.23467816445950107,
+            "trades": 47,
+            "turnover": 94.0
           }
         },
         "best_signal_strategy": "BDE",
@@ -798,30 +833,30 @@
           "block_size": 20,
           "best_signal": "BDE",
           "best_signal_final_multiple": 9.347033665946277,
-          "best_signal_final_ci_05": 1.0237660125790289,
-          "best_signal_final_ci_95": 138.62400177803391,
-          "best_signal_sharpe_ci_05": 0.24385360778463966,
-          "best_signal_sharpe_ci_95": 1.3445958236145192,
-          "observed_best_daily_excess_mean": -0.0006432135884900764,
-          "reality_check_p_value": 0.918
+          "best_signal_final_ci_05": 0.955034102007211,
+          "best_signal_final_ci_95": 81.08649087497605,
+          "best_signal_sharpe_ci_05": 0.21486239730525522,
+          "best_signal_sharpe_ci_95": 1.2262145690689463,
+          "observed_best_daily_excess_mean": -0.0005832662420872286,
+          "reality_check_p_value": 0.908
         }
       },
       "calibration": {
         "version": "adf_zero_lag_v2",
-        "n": 3197,
-        "tau": 480,
+        "n": 3247,
+        "tau": 488,
         "sims": 2000,
         "seed": 123,
         "critical_values": {
-          "sadf_90": 1.7778130935695977,
-          "sadf_95": 2.0068816385361026,
-          "sadf_99": 2.4997957883810655,
-          "qadf_90": 1.67900145143427,
-          "qadf_95": 1.9295614692696428,
-          "qadf_99": 2.360048131241967,
-          "cadf_90": 1.7319906887023186,
-          "cadf_95": 1.9590938676772298,
-          "cadf_99": 2.473986030685405
+          "sadf_90": 1.802745954045438,
+          "sadf_95": 2.021008066500551,
+          "sadf_99": 2.5028156558587007,
+          "qadf_90": 1.7038929652752919,
+          "qadf_95": 1.9166081555022103,
+          "qadf_99": 2.420668531877266,
+          "cadf_90": 1.7499807460005559,
+          "cadf_95": 1.9632709626224694,
+          "cadf_99": 2.485433130399416
         }
       },
       "critical_exceedances": {
@@ -832,27 +867,27 @@
       "tau_sensitivity": [
         {
           "tau_fraction": 0.1,
-          "tau": 320,
+          "tau": 325,
           "max_sadf_date": "2024-03-11",
-          "run_count": 23,
+          "run_count": 21,
           "best_signal_strategy": "BDE",
           "best_signal_final_multiple": 9.347033665946277
         },
         {
           "tau_fraction": 0.15,
-          "tau": 480,
+          "tau": 488,
           "max_sadf_date": "2021-05-11",
-          "run_count": 20,
+          "run_count": 18,
           "best_signal_strategy": "BDE",
           "best_signal_final_multiple": 9.347033665946277
         },
         {
           "tau_fraction": 0.2,
-          "tau": 640,
+          "tau": 650,
           "max_sadf_date": "2021-05-11",
-          "run_count": 20,
-          "best_signal_strategy": "Consensus",
-          "best_signal_final_multiple": 11.54337052043658
+          "run_count": 18,
+          "best_signal_strategy": "BDE",
+          "best_signal_final_multiple": 9.347033665946277
         }
       ]
     },
@@ -862,27 +897,35 @@
       "market": "spot",
       "source": "Binance spot",
       "reason": "spot is available and has the longest Binance spot history requested",
-      "spot_status": "not checked (--skip-download)",
-      "futures_status": "not checked (--skip-download)",
+      "spot_status": "TRADING, spotAllowed=True",
+      "futures_status": "TRADING",
       "raw_start": "2018-06-12",
-      "raw_end": "2026-05-18",
-      "raw_rows": 2898,
-      "close_file": "data/binance_daily/ETC_ETCUSDT_spot_1d.csv",
+      "raw_end": "2026-07-07",
+      "raw_rows": 2948,
+      "close_file": "data\\binance_daily\\ETC_ETCUSDT_spot_1d.csv",
       "clock": "daily close",
-      "test_rows": 2898,
-      "tau": 435,
+      "test_rows": 2948,
+      "tau": 443,
       "tau_fraction": 0.15,
-      "diagnostics_file": "data/binance_daily/ETC_diagnostics_daily.csv",
-      "sdfc_t": -0.1931923105493749,
+      "diagnostics_file": "data\\binance_daily\\ETC_diagnostics_daily.csv",
+      "sdfc_t": -0.2649061760895761,
       "sdfc_candidate": "none (non-positive t)",
       "max_sadf": "2021-05-06",
-      "max_sadf_value": 4.610564906179483,
-      "max_qadf_value": 4.288862684112419,
-      "max_cadf_value": 4.378293617385006,
+      "max_sadf_value": 4.484008425573799,
+      "max_qadf_value": 4.2827199820179525,
+      "max_cadf_value": 4.31904076291042,
       "max_csw": "2020-03-12",
       "max_csw_value": 8.199409278765856,
-      "max_smt": "2021-11-03",
-      "max_smt_value": 2.2067146538172664,
+      "max_smt": "2021-11-17",
+      "max_smt_value": 2.2400593502108204,
+      "hmm": {
+        "states": 3,
+        "refit_days": 126,
+        "min_history": 365,
+        "modeled_days": 2563,
+        "bull_days": 505,
+        "first_modeled_day": "2019-07-02"
+      },
       "runs": [
         {
           "start": "2021-04-15",
@@ -900,36 +943,44 @@
           "days": 2
         },
         {
-          "start": "2021-08-14",
-          "end": "2021-12-23",
-          "days": 132
+          "start": "2021-08-12",
+          "end": "2021-09-09",
+          "days": 29
         },
         {
-          "start": "2024-04-12",
-          "end": "2024-04-12",
+          "start": "2021-09-15",
+          "end": "2021-09-15",
           "days": 1
+        },
+        {
+          "start": "2021-09-20",
+          "end": "2021-12-20",
+          "days": 92
         }
       ],
-      "run_count": 5,
+      "run_count": 6,
       "first_run": "2021-04-15",
-      "strategy_file": "data/binance_daily/ETC_strategy_daily.csv",
+      "strategy_file": "data\\binance_daily\\ETC_strategy_daily.csv",
       "strategies": {
-        "strategy_file": "data/binance_daily/ETC_strategy_daily.csv",
+        "strategy_file": "data\\binance_daily\\ETC_strategy_daily.csv",
         "parameters": {
           "transaction_cost": 0.001,
           "signal_quantile": 0.95,
           "signal_min_history": 60,
           "momentum_days": 20,
           "hold_days": 20,
+          "hmm_states": 3,
+          "hmm_refit_days": 126,
+          "hmm_min_history": 365,
           "buyhold_entry_cost_charged": true
         },
         "metrics": {
           "BuyHold": {
-            "final_multiple": 0.6098542541119183,
-            "total_return": -0.3901457458880817,
-            "cagr": -0.060446358536495826,
-            "max_drawdown": -0.9411342855435367,
-            "sharpe": 0.4332452819639865,
+            "final_multiple": 0.47531753735934523,
+            "total_return": -0.5246824626406548,
+            "cagr": -0.08806159401117508,
+            "max_drawdown": -0.9492768780254587,
+            "sharpe": 0.39972994479016377,
             "exposure": 1.0,
             "trades": 1,
             "turnover": 1.0
@@ -937,78 +988,88 @@
           "BDE": {
             "final_multiple": 1.4409802285591287,
             "total_return": 0.44098022855912866,
-            "cagr": 0.04713673977815058,
+            "cagr": 0.04631875911387873,
             "max_drawdown": -0.7353331157167242,
-            "sharpe": 0.346859803760998,
-            "exposure": 0.15631469979296067,
+            "sharpe": 0.3439047790822929,
+            "exposure": 0.15366350067842605,
             "trades": 7,
             "turnover": 14.0
           },
           "CSW": {
             "final_multiple": 11.441263058002807,
             "total_return": 10.441263058002807,
-            "cagr": 0.3597248180613206,
+            "cagr": 0.35265437069771544,
             "max_drawdown": -0.6719600053617607,
-            "sharpe": 0.77255248318258,
-            "exposure": 0.2560386473429952,
+            "sharpe": 0.7659623476711991,
+            "exposure": 0.25169606512890097,
             "trades": 24,
             "turnover": 48.0
           },
           "SADF": {
-            "final_multiple": 2.2894209504455763,
-            "total_return": 1.2894209504455763,
-            "cagr": 0.11007863314416322,
-            "max_drawdown": -0.6148852566784199,
-            "sharpe": 0.43990049287637445,
-            "exposure": 0.04727398205659075,
+            "final_multiple": 2.1294385137914227,
+            "total_return": 1.1294385137914227,
+            "cagr": 0.09820911916381014,
+            "max_drawdown": -0.61488525667842,
+            "sharpe": 0.4160893520913613,
+            "exposure": 0.04613297150610583,
             "trades": 3,
             "turnover": 6.0
           },
           "QADF": {
-            "final_multiple": 2.1294385137914227,
-            "total_return": 1.1294385137914227,
-            "cagr": 0.09998620413672055,
+            "final_multiple": 2.1409260411264266,
+            "total_return": 1.1409260411264266,
+            "cagr": 0.09894166126181947,
             "max_drawdown": -0.61488525667842,
-            "sharpe": 0.41966517165079265,
-            "exposure": 0.04692891649413389,
+            "sharpe": 0.41758081046426304,
+            "exposure": 0.04647218453188602,
             "trades": 3,
             "turnover": 6.0
           },
           "CADF": {
-            "final_multiple": 2.2894209504455763,
-            "total_return": 1.2894209504455763,
-            "cagr": 0.11007863314416322,
-            "max_drawdown": -0.6148852566784199,
-            "sharpe": 0.43990049287637445,
-            "exposure": 0.04727398205659075,
+            "final_multiple": 2.1294385137914227,
+            "total_return": 1.1294385137914227,
+            "cagr": 0.09820911916381014,
+            "max_drawdown": -0.61488525667842,
+            "sharpe": 0.4160893520913613,
+            "exposure": 0.04613297150610583,
             "trades": 3,
             "turnover": 6.0
           },
           "SMT": {
-            "final_multiple": 0.4542714506550052,
-            "total_return": -0.5457285493449948,
-            "cagr": -0.09469529821870637,
-            "max_drawdown": -0.6692110241198048,
-            "sharpe": -0.18606930306437752,
-            "exposure": 0.060041407867494824,
-            "trades": 5,
-            "turnover": 9.0
+            "final_multiple": 0.6972249899010946,
+            "total_return": -0.3027750100989054,
+            "cagr": -0.04371420320727171,
+            "max_drawdown": -0.8362067617396737,
+            "sharpe": 0.10221669703710355,
+            "exposure": 0.07700135685210312,
+            "trades": 6,
+            "turnover": 11.0
           },
           "Consensus": {
-            "final_multiple": 1.0546022731600748,
-            "total_return": 0.05460227316007482,
-            "cagr": 0.0067253248573559965,
-            "max_drawdown": -0.7890346168599575,
-            "sharpe": 0.26738810205726266,
-            "exposure": 0.1331953071083506,
+            "final_multiple": 1.0022941778946277,
+            "total_return": 0.0022941778946277136,
+            "cagr": 0.00028405416070720335,
+            "max_drawdown": -0.7844349985599675,
+            "sharpe": 0.25120316511066654,
+            "exposure": 0.12924016282225237,
             "trades": 10,
             "turnover": 20.0
+          },
+          "HMM": {
+            "final_multiple": 20.48080587772738,
+            "total_return": 19.48080587772738,
+            "cagr": 0.45387753915459106,
+            "max_drawdown": -0.61488525667842,
+            "sharpe": 0.8932071143001288,
+            "exposure": 0.17130257801899593,
+            "trades": 42,
+            "turnover": 84.0
           }
         },
-        "best_signal_strategy": "CSW",
-        "best_signal_final_multiple": 11.441263058002807,
-        "best_including_buyhold": "CSW",
-        "best_including_buyhold_final_multiple": 11.441263058002807,
+        "best_signal_strategy": "HMM",
+        "best_signal_final_multiple": 20.48080587772738,
+        "best_including_buyhold": "HMM",
+        "best_including_buyhold_final_multiple": 20.48080587772738,
         "walk_forward": {
           "blocks": [
             {
@@ -1069,10 +1130,10 @@
               "train_end": "2023-05-26",
               "test_start": "2023-05-27",
               "test_end": "2023-11-22",
-              "selected_signal": "CSW",
-              "test_final_multiple": 0.9879803599044967,
-              "test_sharpe": 0.07018310956377474,
-              "test_max_drawdown": -0.10946462715105165
+              "selected_signal": "HMM",
+              "test_final_multiple": 0.8341172981823193,
+              "test_sharpe": -2.468770747901456,
+              "test_max_drawdown": -0.17026892049230968
             },
             {
               "train_end": "2023-11-22",
@@ -1096,73 +1157,73 @@
               "train_end": "2024-11-16",
               "test_start": "2024-11-17",
               "test_end": "2025-05-15",
-              "selected_signal": "CSW",
-              "test_final_multiple": 0.9651818004035075,
-              "test_sharpe": 0.14441476828182093,
-              "test_max_drawdown": -0.33591429318003685
+              "selected_signal": "HMM",
+              "test_final_multiple": 1.2916597735160107,
+              "test_sharpe": 1.3139137514676884,
+              "test_max_drawdown": -0.21113143454402927
             },
             {
               "train_end": "2025-05-15",
               "test_start": "2025-05-16",
               "test_end": "2025-11-11",
-              "selected_signal": "CSW",
-              "test_final_multiple": 0.6541208750545516,
-              "test_sharpe": -2.127596758980092,
-              "test_max_drawdown": -0.3704626418342434
+              "selected_signal": "HMM",
+              "test_final_multiple": 0.7240248980313989,
+              "test_sharpe": -2.2985435740464384,
+              "test_max_drawdown": -0.30982178557620166
             },
             {
               "train_end": "2025-11-11",
               "test_start": "2025-11-12",
               "test_end": "2026-05-10",
-              "selected_signal": "CSW",
-              "test_final_multiple": 0.8877157490396931,
-              "test_sharpe": -1.506081949949727,
-              "test_max_drawdown": -0.11830065359477115
+              "selected_signal": "HMM",
+              "test_final_multiple": 1.0,
+              "test_sharpe": null,
+              "test_max_drawdown": 0.0
             }
           ],
           "aggregate": {
-            "final_multiple": 4.577584789563429,
-            "total_return": 3.5775847895634287,
-            "cagr": 0.2934913299713653,
-            "max_drawdown": -0.6719600053617605,
-            "sharpe": 0.6925112740452406,
+            "final_multiple": 6.448753720006631,
+            "total_return": 5.448753720006631,
+            "cagr": 0.3707034552970945,
+            "max_drawdown": -0.6148852566784198,
+            "sharpe": 0.7777377209123795,
             "exposure": null,
             "trades": 0,
             "turnover": null,
             "blocks": 12,
             "test_days": 2160,
-            "selected_signals": "CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW, CSW"
+            "selected_signals": "CSW, CSW, CSW, CSW, CSW, CSW, HMM, CSW, CSW, HMM, HMM, HMM"
           }
         },
         "multiple_testing": {
           "sims": 500,
           "block_size": 20,
-          "best_signal": "CSW",
-          "best_signal_final_multiple": 11.441263058002807,
-          "best_signal_final_ci_05": 0.5514998563566091,
-          "best_signal_final_ci_95": 378.6807848991966,
-          "best_signal_sharpe_ci_05": 0.12876082987093568,
-          "best_signal_sharpe_ci_95": 1.3544468575547048,
-          "observed_best_daily_excess_mean": 0.00022167957235279392,
-          "reality_check_p_value": 0.59
+          "best_signal": "HMM",
+          "best_signal_final_multiple": 20.48080587772738,
+          "best_signal_final_ci_05": 1.113055351798788,
+          "best_signal_final_ci_95": 480.45816979052,
+          "best_signal_sharpe_ci_05": 0.27225638899301874,
+          "best_signal_sharpe_ci_95": 1.4437178672306112,
+          "observed_best_daily_excess_mean": 0.0004148428171596977,
+          "reality_check_p_value": 0.512
         }
       },
       "calibration": {
         "version": "adf_zero_lag_v2",
-        "n": 2898,
-        "tau": 435,
+        "n": 2948,
+        "tau": 443,
         "sims": 2000,
         "seed": 123,
         "critical_values": {
-          "sadf_90": 1.8002150011228073,
-          "sadf_95": 2.0243234330688606,
-          "sadf_99": 2.508448082993434,
-          "qadf_90": 1.7121443379908436,
-          "qadf_95": 1.9063123004411584,
-          "qadf_99": 2.429803932275119,
-          "cadf_90": 1.7493114150467817,
-          "cadf_95": 1.9630636044192171,
-          "cadf_99": 2.4707312868224385
+          "sadf_90": 1.7781649790113554,
+          "sadf_95": 2.008611864855971,
+          "sadf_99": 2.487598258806824,
+          "qadf_90": 1.6815968471434168,
+          "qadf_95": 1.9009238481391182,
+          "qadf_99": 2.3898402680922923,
+          "cadf_90": 1.7226972656180066,
+          "cadf_95": 1.9502248912312312,
+          "cadf_99": 2.428714845554695
         }
       },
       "critical_exceedances": {
@@ -1173,27 +1234,27 @@
       "tau_sensitivity": [
         {
           "tau_fraction": 0.1,
-          "tau": 290,
+          "tau": 295,
           "max_sadf_date": "2021-05-06",
-          "run_count": 13,
-          "best_signal_strategy": "CSW",
-          "best_signal_final_multiple": 11.441263058002807
+          "run_count": 14,
+          "best_signal_strategy": "HMM",
+          "best_signal_final_multiple": 20.48080587772738
         },
         {
           "tau_fraction": 0.15,
-          "tau": 435,
+          "tau": 443,
           "max_sadf_date": "2021-05-06",
-          "run_count": 5,
-          "best_signal_strategy": "CSW",
-          "best_signal_final_multiple": 11.441263058002807
+          "run_count": 6,
+          "best_signal_strategy": "HMM",
+          "best_signal_final_multiple": 20.48080587772738
         },
         {
           "tau_fraction": 0.2,
-          "tau": 580,
+          "tau": 590,
           "max_sadf_date": "2021-05-06",
-          "run_count": 5,
-          "best_signal_strategy": "CSW",
-          "best_signal_final_multiple": 11.441263058002807
+          "run_count": 6,
+          "best_signal_strategy": "HMM",
+          "best_signal_final_multiple": 20.48080587772738
         }
       ]
     },
@@ -1203,37 +1264,45 @@
       "market": "spot",
       "source": "Binance spot",
       "reason": "spot is available and has the longest Binance spot history requested",
-      "spot_status": "not checked (--skip-download)",
-      "futures_status": "not checked (--skip-download)",
+      "spot_status": "TRADING, spotAllowed=True",
+      "futures_status": "TRADING",
       "raw_start": "2020-08-11",
-      "raw_end": "2026-05-18",
-      "raw_rows": 2107,
-      "close_file": "data/binance_daily/SOL_SOLUSDT_spot_1d.csv",
+      "raw_end": "2026-07-07",
+      "raw_rows": 2157,
+      "close_file": "data\\binance_daily\\SOL_SOLUSDT_spot_1d.csv",
       "clock": "daily close",
-      "test_rows": 2107,
-      "tau": 317,
+      "test_rows": 2157,
+      "tau": 324,
       "tau_fraction": 0.15,
-      "diagnostics_file": "data/binance_daily/SOL_diagnostics_daily.csv",
-      "sdfc_t": 0.6223223929147049,
+      "diagnostics_file": "data\\binance_daily\\SOL_diagnostics_daily.csv",
+      "sdfc_t": 0.587830391827473,
       "sdfc_candidate": "2022-12-30",
       "max_sadf": "2023-12-25",
-      "max_sadf_value": 2.5167102637075534,
-      "max_qadf_value": 1.6674769967531224,
-      "max_cadf_value": 2.202524199841875,
+      "max_sadf_value": 2.5167102637075485,
+      "max_qadf_value": 1.6085393478504082,
+      "max_cadf_value": 2.071785210440597,
       "max_csw": "2022-11-09",
       "max_csw_value": 4.810554003783229,
-      "max_smt": "2023-01-12",
-      "max_smt_value": 3.7122860113029827,
+      "max_smt": "2022-01-04",
+      "max_smt_value": 3.91721615514427,
+      "hmm": {
+        "states": 3,
+        "refit_days": 126,
+        "min_history": 365,
+        "modeled_days": 1772,
+        "bull_days": 257,
+        "first_modeled_day": "2021-08-31"
+      },
       "runs": [
         {
-          "start": "2021-09-07",
+          "start": "2021-09-06",
           "end": "2021-09-11",
-          "days": 5
+          "days": 6
         },
         {
-          "start": "2021-11-13",
+          "start": "2021-11-17",
           "end": "2021-11-17",
-          "days": 5
+          "days": 1
         },
         {
           "start": "2021-11-20",
@@ -1251,6 +1320,11 @@
           "days": 2
         },
         {
+          "start": "2022-01-22",
+          "end": "2022-01-22",
+          "days": 1
+        },
+        {
           "start": "2023-01-03",
           "end": "2023-01-03",
           "days": 1
@@ -1261,8 +1335,8 @@
           "days": 3
         },
         {
-          "start": "2023-01-20",
-          "end": "2023-01-20",
+          "start": "2023-07-13",
+          "end": "2023-07-13",
           "days": 1
         },
         {
@@ -1271,26 +1345,29 @@
           "days": 5
         }
       ],
-      "run_count": 9,
-      "first_run": "2021-09-07",
-      "strategy_file": "data/binance_daily/SOL_strategy_daily.csv",
+      "run_count": 10,
+      "first_run": "2021-09-06",
+      "strategy_file": "data\\binance_daily\\SOL_strategy_daily.csv",
       "strategies": {
-        "strategy_file": "data/binance_daily/SOL_strategy_daily.csv",
+        "strategy_file": "data\\binance_daily\\SOL_strategy_daily.csv",
         "parameters": {
           "transaction_cost": 0.001,
           "signal_quantile": 0.95,
           "signal_min_history": 60,
           "momentum_days": 20,
           "hold_days": 20,
+          "hmm_states": 3,
+          "hmm_refit_days": 126,
+          "hmm_min_history": 365,
           "buyhold_entry_cost_charged": true
         },
         "metrics": {
           "BuyHold": {
-            "final_multiple": 25.858608458390137,
-            "total_return": 24.858608458390137,
-            "cagr": 0.757892921797126,
+            "final_multiple": 24.40485675306954,
+            "total_return": 23.40485675306954,
+            "cagr": 0.7181206851713866,
             "max_drawdown": -0.9626992725584275,
-            "sharpe": 1.0604893487793199,
+            "sharpe": 1.0399909335008373,
             "exposure": 1.0,
             "trades": 1,
             "turnover": 1.0
@@ -1298,72 +1375,82 @@
           "BDE": {
             "final_multiple": 5.189433715635746,
             "total_return": 4.189433715635746,
-            "cagr": 0.33053234377738683,
+            "cagr": 0.3217494872793569,
             "max_drawdown": -0.8915001841679618,
-            "sharpe": 0.7636054879173064,
-            "exposure": 0.22638822971048886,
+            "sharpe": 0.7546893044684299,
+            "exposure": 0.2211404728789986,
             "trades": 6,
             "turnover": 12.0
           },
           "CSW": {
             "final_multiple": 27.43262009492007,
             "total_return": 26.43262009492007,
-            "cagr": 0.7760004865309191,
+            "cagr": 0.7525007896950093,
             "max_drawdown": -0.599702624820301,
-            "sharpe": 1.1563427653785419,
-            "exposure": 0.2097769340294257,
+            "sharpe": 1.1428134522501845,
+            "exposure": 0.2049142327306444,
             "trades": 9,
             "turnover": 18.0
           },
           "SADF": {
-            "final_multiple": 4.804982754631141,
-            "total_return": 3.8049827546311414,
-            "cagr": 0.3128886466719756,
-            "max_drawdown": -0.34933514815202604,
-            "sharpe": 0.9418858596652175,
-            "exposure": 0.09492168960607499,
-            "trades": 2,
-            "turnover": 4.0
+            "final_multiple": 2.963886164165159,
+            "total_return": 1.9638861641651588,
+            "cagr": 0.20209421315384324,
+            "max_drawdown": -0.34933514815202593,
+            "sharpe": 0.7209205645874245,
+            "exposure": 0.08854891052387576,
+            "trades": 3,
+            "turnover": 6.0
           },
           "QADF": {
-            "final_multiple": 4.195624199572006,
-            "total_return": 3.1956241995720056,
-            "cagr": 0.2823704730741734,
-            "max_drawdown": -0.34933514815202604,
-            "sharpe": 0.9053784806042873,
-            "exposure": 0.08400569530137636,
+            "final_multiple": 2.6239414350227084,
+            "total_return": 1.6239414350227084,
+            "cagr": 0.17753931729580885,
+            "max_drawdown": -0.34933514815202593,
+            "sharpe": 0.6894182338609204,
+            "exposure": 0.07324988409828466,
             "trades": 2,
             "turnover": 4.0
           },
           "CADF": {
-            "final_multiple": 3.3571844387906635,
-            "total_return": 2.3571844387906635,
-            "cagr": 0.23373385547994152,
-            "max_drawdown": -0.34933514815202615,
-            "sharpe": 0.7845397103484717,
-            "exposure": 0.09159943046986237,
+            "final_multiple": 2.678769733380658,
+            "total_return": 1.678769733380658,
+            "cagr": 0.18167198166470433,
+            "max_drawdown": -0.34933514815202593,
+            "sharpe": 0.671818480104353,
+            "exposure": 0.0880853036624942,
             "trades": 3,
             "turnover": 6.0
           },
           "SMT": {
-            "final_multiple": 4.105923174275824,
-            "total_return": 3.1059231742758238,
-            "cagr": 0.2775729510617515,
-            "max_drawdown": -0.3994350719702833,
-            "sharpe": 0.8543396925249506,
-            "exposure": 0.07214048410061699,
+            "final_multiple": 0.8129442369799572,
+            "total_return": -0.1870557630200428,
+            "cagr": -0.03447547934447359,
+            "max_drawdown": -0.6707477931300583,
+            "sharpe": 0.02996498758073026,
+            "exposure": 0.06583217431617988,
             "trades": 2,
             "turnover": 4.0
           },
           "Consensus": {
-            "final_multiple": 24.864813184662996,
-            "total_return": 23.864813184662996,
-            "cagr": 0.7459853513343606,
+            "final_multiple": 9.449296362057334,
+            "total_return": 8.449296362057334,
+            "cagr": 0.46299670217613365,
             "max_drawdown": -0.5616771173874984,
-            "sharpe": 1.2025574562547376,
-            "exposure": 0.15234931181775035,
+            "sharpe": 0.9405256093489069,
+            "exposure": 0.14140009272137227,
             "trades": 6,
             "turnover": 12.0
+          },
+          "HMM": {
+            "final_multiple": 3.7215591770610983,
+            "total_return": 2.7215591770610983,
+            "cagr": 0.24935842634994332,
+            "max_drawdown": -0.44477331190026625,
+            "sharpe": 0.7446661424345079,
+            "exposure": 0.11914696337505795,
+            "trades": 18,
+            "turnover": 36.0
           }
         },
         "best_signal_strategy": "CSW",
@@ -1455,30 +1542,30 @@
           "block_size": 20,
           "best_signal": "CSW",
           "best_signal_final_multiple": 27.43262009492007,
-          "best_signal_final_ci_05": 1.5605837898026764,
-          "best_signal_final_ci_95": 759.32270230298,
-          "best_signal_sharpe_ci_05": 0.4464617495079656,
-          "best_signal_sharpe_ci_95": 1.860403201797197,
-          "observed_best_daily_excess_mean": -0.0011633987864592312,
+          "best_signal_final_ci_05": 1.772578621580578,
+          "best_signal_final_ci_95": 637.2485216358946,
+          "best_signal_sharpe_ci_05": 0.4492464076316733,
+          "best_signal_sharpe_ci_95": 1.814498960319256,
+          "observed_best_daily_excess_mean": -0.001121539205535629,
           "reality_check_p_value": 0.958
         }
       },
       "calibration": {
         "version": "adf_zero_lag_v2",
-        "n": 2107,
-        "tau": 317,
+        "n": 2157,
+        "tau": 324,
         "sims": 2000,
         "seed": 123,
         "critical_values": {
-          "sadf_90": 1.7804689557021145,
-          "sadf_95": 2.024426919332061,
-          "sadf_99": 2.520258547514728,
-          "qadf_90": 1.708951154199234,
-          "qadf_95": 1.9104843575075872,
-          "qadf_99": 2.461961968544923,
-          "cadf_90": 1.7323392604142205,
-          "cadf_95": 1.962625356313857,
-          "cadf_99": 2.493823617920018
+          "sadf_90": 1.7879305648900858,
+          "sadf_95": 2.0473164363459477,
+          "sadf_99": 2.502725508355308,
+          "qadf_90": 1.702688386580683,
+          "qadf_95": 1.9434553187234256,
+          "qadf_99": 2.4227937339896837,
+          "cadf_90": 1.738268433025521,
+          "cadf_95": 1.991930533219259,
+          "cadf_99": 2.473639148090451
         }
       },
       "critical_exceedances": {
@@ -1489,25 +1576,25 @@
       "tau_sensitivity": [
         {
           "tau_fraction": 0.1,
-          "tau": 211,
+          "tau": 216,
           "max_sadf_date": "2023-12-25",
-          "run_count": 17,
+          "run_count": 16,
           "best_signal_strategy": "CSW",
           "best_signal_final_multiple": 27.43262009492007
         },
         {
           "tau_fraction": 0.15,
-          "tau": 317,
+          "tau": 324,
           "max_sadf_date": "2023-12-25",
-          "run_count": 9,
+          "run_count": 10,
           "best_signal_strategy": "CSW",
           "best_signal_final_multiple": 27.43262009492007
         },
         {
           "tau_fraction": 0.2,
-          "tau": 422,
+          "tau": 432,
           "max_sadf_date": "2024-03-17",
-          "run_count": 14,
+          "run_count": 15,
           "best_signal_strategy": "CSW",
           "best_signal_final_multiple": 27.43262009492007
         }
@@ -1519,27 +1606,35 @@
       "market": "futures",
       "source": "Binance USD-M futures",
       "reason": "spot is unavailable; used Binance USD-M futures fallback",
-      "spot_status": "not checked (--skip-download)",
-      "futures_status": "not checked (--skip-download)",
+      "spot_status": "unavailable (Invalid symbol.)",
+      "futures_status": "TRADING",
       "raw_start": "2025-05-30",
-      "raw_end": "2026-05-18",
-      "raw_rows": 354,
-      "close_file": "data/binance_daily/HYPE_HYPEUSDT_futures_1d.csv",
+      "raw_end": "2026-07-07",
+      "raw_rows": 404,
+      "close_file": "data\\binance_daily\\HYPE_HYPEUSDT_futures_1d.csv",
       "clock": "daily close",
-      "test_rows": 354,
-      "tau": 60,
+      "test_rows": 404,
+      "tau": 61,
       "tau_fraction": 0.15,
-      "diagnostics_file": "data/binance_daily/HYPE_diagnostics_daily.csv",
-      "sdfc_t": 1.4404330371173182,
+      "diagnostics_file": "data\\binance_daily\\HYPE_diagnostics_daily.csv",
+      "sdfc_t": 1.7062074941525307,
       "sdfc_candidate": "2026-01-21",
-      "max_sadf": "2025-12-18",
-      "max_sadf_value": 0.45694667345069095,
-      "max_qadf_value": 0.32058406430670716,
-      "max_cadf_value": 0.40668063330440674,
+      "max_sadf": "2026-06-01",
+      "max_sadf_value": 1.2338359590347578,
+      "max_qadf_value": 1.0094337023352895,
+      "max_cadf_value": 1.142803548548363,
       "max_csw": "2026-01-28",
       "max_csw_value": 2.6171825471063657,
       "max_smt": "2025-12-28",
       "max_smt_value": 3.616657601594574,
+      "hmm": {
+        "states": 3,
+        "refit_days": 126,
+        "min_history": 365,
+        "modeled_days": 19,
+        "bull_days": 1,
+        "first_modeled_day": "2026-06-19"
+      },
       "runs": [
         {
           "start": "2025-12-18",
@@ -1547,99 +1642,112 @@
           "days": 1
         },
         {
-          "start": "2025-12-23",
-          "end": "2025-12-25",
+          "start": "2026-01-23",
+          "end": "2026-01-26",
+          "days": 4
+        },
+        {
+          "start": "2026-05-21",
+          "end": "2026-05-21",
+          "days": 1
+        },
+        {
+          "start": "2026-05-23",
+          "end": "2026-05-25",
           "days": 3
         },
         {
-          "start": "2026-01-01",
-          "end": "2026-01-02",
-          "days": 2
-        },
-        {
-          "start": "2026-01-20",
-          "end": "2026-01-22",
+          "start": "2026-05-30",
+          "end": "2026-06-01",
           "days": 3
         },
         {
-          "start": "2026-01-26",
-          "end": "2026-01-27",
+          "start": "2026-06-03",
+          "end": "2026-06-04",
           "days": 2
+        },
+        {
+          "start": "2026-06-16",
+          "end": "2026-06-16",
+          "days": 1
         }
       ],
-      "run_count": 5,
+      "run_count": 7,
       "first_run": "2025-12-18",
-      "strategy_file": "data/binance_daily/HYPE_strategy_daily.csv",
+      "strategy_file": "data\\binance_daily\\HYPE_strategy_daily.csv",
       "strategies": {
-        "strategy_file": "data/binance_daily/HYPE_strategy_daily.csv",
+        "strategy_file": "data\\binance_daily\\HYPE_strategy_daily.csv",
         "parameters": {
           "transaction_cost": 0.001,
           "signal_quantile": 0.95,
           "signal_min_history": 60,
           "momentum_days": 20,
           "hold_days": 20,
+          "hmm_states": 3,
+          "hmm_refit_days": 126,
+          "hmm_min_history": 365,
           "buyhold_entry_cost_charged": true
         },
         "metrics": {
           "BuyHold": {
-            "final_multiple": 1.4533233788395885,
-            "total_return": 0.4533233788395885,
-            "cagr": 0.47230112604757424,
+            "final_multiple": 2.106192528035102,
+            "total_return": 1.106192528035102,
+            "cagr": 0.9642429769529235,
             "max_drawdown": -0.6424396312264617,
-            "sharpe": 0.872038963054017,
+            "sharpe": 1.1746833971682957,
             "exposure": 1.0,
             "trades": 1,
             "turnover": 1.0
           },
           "BDE": {
-            "final_multiple": 1.104332945318086,
-            "total_return": 0.1043329453180859,
-            "cagr": 0.10814275002205043,
+            "final_multiple": 1.1905462672196774,
+            "total_return": 0.19054626721967738,
+            "cagr": 0.1712535973868854,
             "max_drawdown": -0.2576871226131051,
-            "sharpe": 0.44391118655883277,
-            "exposure": 0.11581920903954802,
-            "trades": 1,
-            "turnover": 2.0
+            "sharpe": 0.5770416484163575,
+            "exposure": 0.1311881188118812,
+            "trades": 2,
+            "turnover": 3.0
           },
           "CSW": {
-            "final_multiple": 1.0949715640185764,
-            "total_return": 0.09497156401857643,
-            "cagr": 0.09842452218271713,
+            "final_multiple": 1.617855853373092,
+            "total_return": 0.617855853373092,
+            "cagr": 0.5465640754026844,
             "max_drawdown": -0.4577553055324117,
-            "sharpe": 0.4473918097056058,
-            "exposure": 0.384180790960452,
+            "sharpe": 0.986937756690709,
+            "exposure": 0.45792079207920794,
             "trades": 7,
-            "turnover": 13.0
+            "turnover": 14.0
           },
           "SADF": {
-            "final_multiple": 1.0,
-            "total_return": 0.0,
-            "cagr": 0.0,
-            "max_drawdown": 0.0,
-            "sharpe": null,
-            "exposure": 0.0,
-            "trades": 0,
-            "turnover": 0.0
+            "final_multiple": 1.2612916248136128,
+            "total_return": 0.2612916248136128,
+            "cagr": 0.23416116163528167,
+            "max_drawdown": -0.28517599731813614,
+            "sharpe": 0.7511071479772958,
+            "exposure": 0.1188118811881188,
+            "trades": 1,
+            "turnover": 1.0
           },
           "QADF": {
-            "final_multiple": 1.0,
-            "total_return": 0.0,
-            "cagr": 0.0,
-            "max_drawdown": 0.0,
-            "sharpe": null,
-            "exposure": 0.0,
-            "trades": 0,
-            "turnover": 0.0
+            "final_multiple": 1.2612916248136128,
+            "total_return": 0.2612916248136128,
+            "cagr": 0.23416116163528167,
+            "max_drawdown": -0.28517599731813614,
+            "sharpe": 0.7511071479772958,
+            "exposure": 0.1188118811881188,
+            "trades": 1,
+            "turnover": 1.0
           },
           "CADF": {
-            "final_multiple": 1.0,
-            "total_return": 0.0,
-            "cagr": 0.0,
-            "max_drawdown": 0.0,
-            "sharpe": null,
-            "exposure": 0.0,
-            "trades": 0,
-            "turnover": 0.0
+            "final_multiple": 1.2612916248136128,
+            "total_return": 0.2612916248136128,
+            "cagr": 0.23416116163528167,
+            "max_drawdown": -0.28517599731813614,
+            "sharpe": 0.7511071479772958,
+            "exposure": 0.1188118811881188,
+            "trades": 1,
+            "turnover": 1.0
           },
           "SMT": {
             "final_multiple": 1.0,
@@ -1652,20 +1760,30 @@
             "turnover": 0.0
           },
           "Consensus": {
-            "final_multiple": 1.012559371306804,
-            "total_return": 0.012559371306803957,
-            "cagr": 0.012998034069233055,
-            "max_drawdown": -0.1870913190529876,
-            "sharpe": 0.17563938141753546,
-            "exposure": 0.05649717514124294,
+            "final_multiple": 1.3020785519824445,
+            "total_return": 0.3020785519824445,
+            "cagr": 0.270278180938452,
+            "max_drawdown": -0.28517599731813614,
+            "sharpe": 0.7631656997318919,
+            "exposure": 0.16584158415841585,
+            "trades": 2,
+            "turnover": 4.0
+          },
+          "HMM": {
+            "final_multiple": 0.9566965318854613,
+            "total_return": -0.04330346811453867,
+            "cagr": -0.03932801164558841,
+            "max_drawdown": -0.04330346811453867,
+            "sharpe": -0.973946182392916,
+            "exposure": 0.0024752475247524753,
             "trades": 1,
             "turnover": 2.0
           }
         },
-        "best_signal_strategy": "BDE",
-        "best_signal_final_multiple": 1.104332945318086,
+        "best_signal_strategy": "CSW",
+        "best_signal_final_multiple": 1.617855853373092,
         "best_including_buyhold": "BuyHold",
-        "best_including_buyhold_final_multiple": 1.4533233788395885,
+        "best_including_buyhold_final_multiple": 2.106192528035102,
         "walk_forward": {
           "blocks": [],
           "aggregate": {
@@ -1680,32 +1798,32 @@
         "multiple_testing": {
           "sims": 500,
           "block_size": 20,
-          "best_signal": "BDE",
-          "best_signal_final_multiple": 1.104332945318086,
-          "best_signal_final_ci_05": 0.6681662324596714,
-          "best_signal_final_ci_95": 1.9719895604731916,
-          "best_signal_sharpe_ci_05": -1.5727885834274156,
-          "best_signal_sharpe_ci_95": 1.4564491391130314,
-          "observed_best_daily_excess_mean": -0.001539196760627176,
-          "reality_check_p_value": 0.898
+          "best_signal": "CSW",
+          "best_signal_final_multiple": 1.617855853373092,
+          "best_signal_final_ci_05": 0.6069672808312828,
+          "best_signal_final_ci_95": 4.157560856408057,
+          "best_signal_sharpe_ci_05": -0.3759276674632608,
+          "best_signal_sharpe_ci_95": 2.306982151185073,
+          "observed_best_daily_excess_mean": -0.0013013274561462734,
+          "reality_check_p_value": 0.91
         }
       },
       "calibration": {
         "version": "adf_zero_lag_v2",
-        "n": 354,
-        "tau": 60,
+        "n": 404,
+        "tau": 61,
         "sims": 2000,
         "seed": 123,
         "critical_values": {
-          "sadf_90": 1.7288713918847025,
-          "sadf_95": 1.9816674572301984,
-          "sadf_99": 2.4851378937896285,
-          "qadf_90": 1.6336982222879513,
-          "qadf_95": 1.8935167125790808,
-          "qadf_99": 2.349326807999859,
-          "cadf_90": 1.6780742026734135,
-          "cadf_95": 1.9419484793900952,
-          "cadf_99": 2.3884698112178526
+          "sadf_90": 1.780922296880659,
+          "sadf_95": 2.0252367509318074,
+          "sadf_99": 2.537599433452461,
+          "qadf_90": 1.6713325781907888,
+          "qadf_95": 1.9055557482028316,
+          "qadf_99": 2.428704119630523,
+          "cadf_90": 1.7176883113852532,
+          "cadf_95": 1.9673037322131963,
+          "cadf_99": 2.4703406721837946
         }
       },
       "critical_exceedances": {
@@ -1717,26 +1835,26 @@
         {
           "tau_fraction": 0.1,
           "tau": 60,
-          "max_sadf_date": "2025-12-18",
-          "run_count": 5,
-          "best_signal_strategy": "BDE",
-          "best_signal_final_multiple": 1.104332945318086
+          "max_sadf_date": "2026-06-01",
+          "run_count": 7,
+          "best_signal_strategy": "CSW",
+          "best_signal_final_multiple": 1.617855853373092
         },
         {
           "tau_fraction": 0.15,
-          "tau": 60,
-          "max_sadf_date": "2025-12-18",
-          "run_count": 5,
-          "best_signal_strategy": "BDE",
-          "best_signal_final_multiple": 1.104332945318086
+          "tau": 61,
+          "max_sadf_date": "2026-06-01",
+          "run_count": 7,
+          "best_signal_strategy": "CSW",
+          "best_signal_final_multiple": 1.617855853373092
         },
         {
           "tau_fraction": 0.2,
-          "tau": 71,
-          "max_sadf_date": "2025-12-18",
-          "run_count": 5,
-          "best_signal_strategy": "BDE",
-          "best_signal_final_multiple": 1.104332945318086
+          "tau": 81,
+          "max_sadf_date": "2026-06-01",
+          "run_count": 7,
+          "best_signal_strategy": "CSW",
+          "best_signal_final_multiple": 1.617855853373092
         }
       ]
     }

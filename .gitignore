@@ -1,4 +1,5 @@
-# Copyrighted reference source: do not commit.
+# Copyrighted reference sources: do not commit.
+books/
 Marcos Lopez de Prado - Advances in Financial Machine Learning (2018, Wiley) - libgen.li.pdf
 
 # LaTeX build byproducts.
@@ -11,3 +12,6 @@ Marcos Lopez de Prado - Advances in Financial Machine Learning (2018, Wiley) - l
 # Python cache.
 __pycache__/
 *.py[cod]
+
+# YouTube video production assets: do not commit.
+youtube/

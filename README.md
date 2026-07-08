@@ -2,7 +2,13 @@
 
 This repository contains a reproducible empirical report on crypto market
 structure-break diagnostics inspired by structural-break methods in Marcos
-Lopez de Prado's *Advances in Financial Machine Learning*.
+Lopez de Prado's *Advances in Financial Machine Learning* (Chapter 17: BDE and
+Chu-Stinchcombe-White CUSUM tests, Chow-type Dickey-Fuller/SDFC, SADF, QADF,
+CADF, and the SM-Exp/SM-Power/SM-Poly sub- and super-martingale trend battery),
+plus a walk-forward Gaussian hidden Markov model (HMM) regime filter. The HMM
+is trained on expanding windows at fixed refit dates, uses filtered (causal)
+state probabilities only, and maps states to signals from training data only,
+so it carries no forward-looking bias.
 
 The analysis uses Binance daily OHLCV data for BTC, ETH, ETC, SOL, and HYPE.
 Spot markets are used where Binance spot history is available; HYPE falls back
