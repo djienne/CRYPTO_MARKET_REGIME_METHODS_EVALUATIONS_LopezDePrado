@@ -10,6 +10,7 @@ report from a template so numerical tables cannot go stale.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import math
 import os
@@ -1852,6 +1853,48 @@ def render_rows(results: dict[str, dict], config: RunConfig) -> dict[str, str | 
     }
 
 
+def render_appendix_code() -> str:
+    """Render the reference-implementation appendix as LaTeX ``lstlisting`` blocks.
+
+    Each function is pulled straight from this module with ``inspect.getsource`` so
+    the code printed in the report is exactly the code that produced the numbers,
+    with no risk of drift. Grouped to mirror the math appendix. Injected into the
+    template via the ``%%APPENDIX_CODE%%`` token (see ``render_report``); it is kept
+    out of ``render_rows`` on purpose so the large source blob does not land in the
+    strict JSON snippet file.
+    """
+    groups: list[tuple[str, list]] = [
+        ("Shared regression core", [_ols_beta_tstat_intercept_from_sums]),
+        ("Indicator statistics", [adf_family, csw_excess, recursive_cusum, smt_trend_score, sdfc]),
+        (
+            "Hidden Markov regime filter",
+            [_gaussian_diag_loglik, _hmm_forward_filter, fit_gaussian_hmm, hmm_regime_signal],
+        ),
+        ("Alert rule and signal pipeline", [online_high_signal, compute_strategy_suite]),
+        ("Finite-sample Monte Carlo calibration", [_simulate_adf_worker, simulate_adf_critical_values]),
+        ("Long/flat backtest and metrics", [max_drawdown, metrics_from_returns, backtest_position]),
+        (
+            "Validation: block bootstrap and walk-forward",
+            [block_bootstrap_indices, bootstrap_multiple_testing, walk_forward_evaluation],
+        ),
+    ]
+    parts: list[str] = []
+    for group_title, funcs in groups:
+        parts.append(f"\\subsection{{{group_title}}}")
+        for fn in funcs:
+            source = inspect.getsource(fn).rstrip("\n")
+            if "%%" in source:
+                raise RuntimeError(
+                    f"function {fn.__name__} contains a '%%' token that would break the template guard"
+                )
+            escaped_name = fn.__name__.replace("_", r"\_")
+            parts.append(f"\\subsubsection*{{\\texttt{{{escaped_name}}}}}")
+            parts.append("\\begin{lstlisting}[language=Python]")
+            parts.append(source)
+            parts.append("\\end{lstlisting}")
+    return "\n".join(parts)
+
+
 def render_report(results: dict[str, dict], payload: dict, config: RunConfig) -> None:
     if not REPORT_TEMPLATE_PATH.exists():
         raise FileNotFoundError(f"missing report template: {REPORT_TEMPLATE_PATH}")
@@ -1860,6 +1903,7 @@ def render_report(results: dict[str, dict], payload: dict, config: RunConfig) ->
     replacements = {
         "GENERATED_DATE": datetime.now(timezone.utc).date().isoformat(),
         "LAST_CLOSED_DAY": payload["last_closed_day"],
+        "APPENDIX_CODE": render_appendix_code(),
         **{key: value for key, value in rows.items() if isinstance(value, str)},
     }
     rendered = template

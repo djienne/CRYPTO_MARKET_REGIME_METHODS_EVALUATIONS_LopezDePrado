@@ -118,6 +118,8 @@ HMM regime filter & Hamilton (1989); Cartea et al.\ Ch.~12 & walk-forward, filte
 \caption{Where each diagnostic comes from and how closely it follows the source definition.}
 \end{table}
 
+Complete formal definitions of every statistic, the alert rule, the long/flat backtest, the finite-sample calibration null, and the validation checks are collected in Appendix~\ref{app:math}, and the reference Python that computes them is reproduced verbatim in Appendix~\ref{app:code}. Together they are sufficient to recompute every number in this report from the raw daily closes.
+
 \subsection{CUSUM Tests}
 
 CUSUM means cumulative sum. The BDE-inspired series in this report is a recursive one-step forecast-error CUSUM from a simple log-price trend model. At each close $t$ the trend model is refitted on all data before $t$, and the standardized forecast error
@@ -583,5 +585,1031 @@ The generator writes daily diagnostics, strategy PnL CSVs, cached calibration fi
     \item Binance API daily kline endpoints for BTCUSDT, ETHUSDT, ETCUSDT, SOLUSDT spot, and HYPEUSDT USD-M futures fallback.
     \item Local reproduction script: \texttt{scripts/generate\_daily\_regime\_chapter.py}.
 \end{itemize}
+
+\appendix
+
+\section{Full Mathematical Specification}\label{app:math}
+
+This appendix gives the complete formal definition of every statistic, the alert rule, the long/flat backtest, the finite-sample calibration, and the validation checks, so that all numbers in this report can be reproduced from the raw daily closes alone. Every structural-break detector is an implementation of a method from Marcos L\'opez de Prado, \emph{Advances in Financial Machine Learning} (Wiley, 2018), Chapter~17, sections 17.3--17.4; the latent-regime filter follows the Markov-chain regime models of \'Alvaro Cartea, Sebastian Jaimungal, and Jos\'e Penalva, \emph{Algorithmic and High-Frequency Trading} (Cambridge University Press, 2015), Chapter~12, together with the Markov-switching model of Hamilton (1989). The reference Python that evaluates each expression below is reproduced verbatim in Appendix~\ref{app:code}.
+
+Throughout, $p_t$ denotes the daily close, $y_t=\log p_t$ the log price, and $r_t = p_t/p_{t-1}-1$ the simple return; $n$ is the number of observations. All detectors are \emph{causal}: the value published at date $t$ uses only information available at or before $t$. The minimum backward window is
+\[
+    \tau = \max\!\left(60,\ \left\lceil 0.15\,n \right\rceil\right).
+\]
+
+\subsection{Shared regression core}
+
+Most detectors reduce to the slope $t$-statistic of a straight-line fit on a backward window. For a window with points $\{(x_i,z_i)\}_{i=1}^{m}$ define the centered moments
+\[
+    S_{xx}=\sum_i x_i^2-\tfrac{1}{m}\Big(\sum_i x_i\Big)^2,\qquad
+    S_{xz}=\sum_i x_i z_i-\tfrac{1}{m}\sum_i x_i\sum_i z_i,\qquad
+    S_{zz}=\sum_i z_i^2-\tfrac{1}{m}\Big(\sum_i z_i\Big)^2 .
+\]
+Then the ordinary-least-squares slope, its residual variance, and its $t$-statistic are
+\[
+    \hat\beta=\frac{S_{xz}}{S_{xx}},\qquad
+    \mathrm{SSE}=S_{zz}-\hat\beta\,S_{xz},\qquad
+    \hat\sigma^2=\frac{\mathrm{SSE}}{m-2},\qquad
+    t=\frac{\hat\beta}{\sqrt{\hat\sigma^2/S_{xx}}} .
+\]
+Because $S_{xx},S_{xz},S_{zz}$ are assembled from prefix sums, every backward window ending at $t$ is evaluated in $O(1)$. The ADF-style tests use the zero-lag Dickey--Fuller regression
+\[
+    \Delta y_i = \alpha + \beta\,y_{i-1} + \varepsilon_i ,
+\]
+whose slope $t$-statistic $DF=\hat\beta/\mathrm{se}(\hat\beta)$ is the quantity above with $x_i=y_{i-1}$ and $z_i=\Delta y_i$. Under a random walk $\beta=0$; a significantly positive $\hat\beta$ is the explosive (mean-repelling) alternative.
+
+\subsection{BDE recursive CUSUM (AFML 17.3.1)}
+
+Following Brown, Durbin, and Evans (1975), fit the log-price trend $y=\hat\alpha_{t-1}+\hat\beta_{t-1}\,\mathrm{time}$ on all data strictly before $t$ and form the standardized one-step-ahead recursive residual
+\[
+    \hat\omega_t = \frac{y_t - \hat\alpha_{t-1} - \hat\beta_{t-1}\, t}{\hat\sigma_{t-1}\sqrt{1 + h_t}},
+    \qquad
+    h_t = \frac{1}{t} + \frac{(t-\bar x)^2}{S_{xx}},
+\]
+where $h_t$ is the leverage of the new time index and $\hat\sigma_{t-1}$ the in-sample residual scale. The residuals are standardized online with a shifted expanding mean and standard deviation, $z_t=(\hat\omega_t-\mu_{<t})/\sigma_{<t}$, and accumulated into a scaled CUSUM
+\[
+    W_t = \frac{1}{\sqrt{N_t}}\sum_{i\le t} z_i ,
+\]
+with $N_t$ the count of finite $z_i$ through $t$. A large $|W_t|$ marks a persistent, one-sided drift of forecast errors, i.e.\ a change in the trend regime.
+
+\subsection{Chu--Stinchcombe--White excess (AFML 17.3.2)}
+
+At each date $t$, and for every earlier reference point $n<t$, measure how far log price has travelled from its level at $n$, standardized by realized volatility:
+\[
+    S_{n,t} = \frac{y_t-y_n}{\hat\sigma_t\sqrt{t-n}},
+    \qquad
+    \hat\sigma_t^2 = \frac{1}{t}\sum_{i\le t} (\Delta y_i)^2 .
+\]
+Chu, Stinchcombe, and White (1996) monitor $S_{n,t}$ against a time-varying boundary; here the reported statistic is the supremum \emph{excess} over that boundary, applied symmetrically to bubbles and crashes,
+\[
+    \mathrm{CSW}_t = \max_{n<t}\Big(\,\lvert S_{n,t}\rvert - c_{n,t}\,\Big),
+    \qquad
+    c_{n,t} = \sqrt{\,4.6 + \ln(t-n)\,},
+\]
+where $4.6$ is the asymptotic 5\% constant of the test. Values $\mathrm{CSW}_t>0$ indicate the boundary was crossed.
+
+\subsection{ADF family: SADF, QADF, CADF (AFML 17.4.2)}
+
+Fix the endpoint $t$ and run the zero-lag ADF regression on every backward window $[s,t]$ of length at least $\tau$, producing the set of Dickey--Fuller slope $t$-statistics
+\[
+    \mathcal{D}_t = \big\{\, DF_{s,t} : 0 \le s \le t-\tau \,\big\}.
+\]
+The three summaries collapse this set in different ways:
+\[
+    \mathrm{SADF}_t = \sup_{s} DF_{s,t},
+    \qquad
+    \mathrm{QADF}_t = Q_{0.95}\!\big(\mathcal{D}_t\big),
+    \qquad
+    \mathrm{CADF}_t = \operatorname{mean}\big\{\, d \in \mathcal{D}_t : d \ge Q_{0.95}(\mathcal{D}_t) \,\big\},
+\]
+i.e.\ the supremum ADF of Phillips, Wu, and Yu (2011), the 95th percentile of the window statistics, and the conditional mean of the upper 5\% tail. All three use $\tau$ as the minimum window.
+
+\subsection{SMT trend battery (AFML 17.4.3)}
+
+For each backward window $[t_0,t]$ (length $m=t-t_0+1$) fit four trend specifications and take the penalized absolute trend $t$-statistic:
+\begin{itemize}
+    \item SM-Exp: linear regression of $y$ (log price) on time,
+    \item SM-Power: linear regression of $y$ on $\log(\mathrm{time})$,
+    \item SM-Poly2: quadratic regression of $y$ on time and time$^2$,
+    \item SM-Poly1: quadratic regression of the normalized raw price $p_t/p_0$ on time and time$^2$,
+\end{itemize}
+where the quadratic $t$-statistic is that of the leading (curvature) coefficient. The score aggregates all four forms and all windows,
+\[
+    \mathrm{SMT}_t = \sup_{t_0 \in [1,\,t-\tau]}\ \max_{f\in\{\mathrm{Exp,Power,Poly1,Poly2}\}}
+    \left\{ \frac{\big\lvert \hat\beta^{(f)}_{t_0,t}\big\rvert}{\hat\sigma_{\beta^{(f)}_{t_0,t}}\,(t-t_0)^{\varphi}} \right\},
+    \qquad \varphi = 0.5,
+\]
+the length penalty $(t-t_0)^{\varphi}$ preventing long windows from dominating through mechanically large $t$-values.
+
+\subsection{SDFC break test (AFML 17.4.1)}
+
+The supremum Dickey--Fuller--Chow statistic scans every candidate break date $t^\ast$ and tests a single switch into an explosive regime, reporting the largest break $t$-statistic over the sample. Because the break date is chosen using the full sample, it is a retrospective diagnostic and is \emph{not} converted into a traded strategy in this report.
+
+\subsection{Hidden Markov regime filter (Cartea et al.\ Ch.~12; Hamilton 1989)}
+
+A Gaussian HMM is fitted on two causal daily features, the one-day log return and the trailing $20$-day log momentum, $x_t=\big(y_t-y_{t-1},\ y_t-y_{t-20}\big)$. The market is assumed to switch between $K=3$ latent states following a Markov chain with transition matrix $A$, with state-conditional Gaussian emissions
+\[
+    x_t \mid s_t = k \sim \mathcal{N}(\mu_k, \Sigma_k),
+    \qquad
+    \Pr[s_t = k \mid x_{1:t}] \propto
+    \Big( \textstyle\sum_j \Pr[s_{t-1}=j \mid x_{1:t-1}]\, A_{jk} \Big)\, \mathcal{N}(x_t; \mu_k, \Sigma_k).
+\]
+The right-hand recursion is the \emph{filtered} state probability, conditioning only on observations up to $t$. Parameters are estimated by deterministic Baum--Welch EM: the E-step computes responsibilities $\gamma_{t}(k)=\Pr[s_t=k\mid x_{1:T}]$ and pair marginals by the forward--backward algorithm; the M-step re-estimates
+\[
+    \mu_k = \frac{\sum_t \gamma_t(k)\,x_t}{\sum_t \gamma_t(k)},
+    \qquad
+    \Sigma_k = \operatorname{diag}\!\frac{\sum_t \gamma_t(k)\,(x_t-\mu_k)^2}{\sum_t \gamma_t(k)},
+    \qquad
+    A_{jk} \propto \sum_t \xi_t(j,k),
+\]
+with a variance floor and quantile-based initialization (so no random seed is needed). The fit is refit walk-forward every $126$ days on an expanding window (minimum $365$ observations). The ``bull'' state is the one with the highest EM-weighted mean return on the training window, used only if that mean is positive; the regime at $t$ is the argmax of the filtered probabilities, and the signal is long while the state equals the bull state.
+
+\subsection{Consensus}
+
+The consensus detector fires only when at least two independent families agree on the same day:
+\[
+    \mathrm{Consensus}_t = \mathbb{1}\!\left\{\ \sum_{m\,\in\,\{\mathrm{BDE},\,\mathrm{CSW},\,\mathrm{SADF},\,\mathrm{SMT}\}} \mathrm{alert}_{m,t}\ \ge\ 2\ \right\},
+\]
+where $\mathrm{alert}_{m,t}\in\{0,1\}$ is the (momentum-gated) alert of member $m$ defined next. The QADF, CADF, and HMM signals are not part of the vote.
+
+\subsection{Alert rule and signal pipeline}
+
+Every structural-break statistic $g_t$ is turned into a binary alert by a purely causal, self-referential threshold: the alert fires when the statistic exceeds the $95$th percentile of its own strictly-prior history,
+\[
+    \mathrm{alert}_t = \mathbb{1}\!\left\{\ g_t > Q_{0.95}\big(\{g_i\}_{i<t}\big)\ \right\}\ \wedge\ \mathbb{1}\{\,y_t-y_{t-20}>0\,\},
+\]
+using an expanding window with a $60$-observation warm-up, shifted by one day so no contemporaneous information leaks. The second factor is the $20$-day momentum gate. (CSW uses its own zero boundary $\mathrm{CSW}_t>0$ in place of the quantile; the HMM uses its filtered bull-state indicator directly.) An alert opens a long position held for $H=20$ days, and the traded position is lagged one day for next-close execution:
+\[
+    \mathrm{held}_t = \max_{0\le k<H} \mathrm{alert}_{t-k},
+    \qquad
+    w_t = \mathrm{held}_{t-1}\in\{0,1\}.
+\]
+
+\subsection{Long/flat backtest and performance metrics}
+
+With position $w_t\in\{0,1\}$, turnover $u_t=\lvert w_t-w_{t-1}\rvert$, and proportional cost $c=0.001$ (0.1\% per unit turnover), the net strategy return and equity are
+\[
+    \rho_t = w_t\, r_t - c\,u_t,
+    \qquad
+    E_t = \prod_{i\le t}(1+\rho_i).
+\]
+Writing $Y=(\text{days})/365.25$ for the sample length in years, the reported metrics are
+\[
+    \text{multiple}=E_n,\quad
+    \mathrm{CAGR}=E_n^{1/Y}-1,\quad
+    \mathrm{Sharpe}=\sqrt{365}\,\frac{\bar\rho}{\mathrm{std}(\rho)},\quad
+    \mathrm{MDD}=\min_t\!\left(\frac{E_t}{\max_{i\le t}E_i}-1\right),
+\]
+together with exposure $=\overline{w}$ (mean position) and the trade count $=\#\{t: w_t>0,\ w_{t-1}\le 0\}$ (flat$\to$long transitions). Buy-and-hold uses $w_t\equiv1$ with a single entry cost.
+
+\subsection{Finite-sample Monte Carlo calibration}
+
+Asymptotic ADF critical values are unreliable in finite samples, so the ADF-family thresholds are calibrated by simulation. For the asset's own length $n$ and window $\tau$, draw $2000$ Gaussian random walks $y^{(b)}=\operatorname{cumsum}(\varepsilon)$ (the unit-root null, seed $123$), run the identical \texttt{adf\_family} routine on each, and record the sample supremum of each series. The empirical $90/95/99$th percentiles of those $2000$ maxima are the critical values, cached on disk keyed by $(n,\tau,\text{sims},\text{seed})$ and reused across runs. The count of dates whose statistic exceeds the simulated 95\% value is reported as a retrospective significance check (not a per-date p-value).
+
+\subsection{Validation: block bootstrap and walk-forward}
+
+Two out-of-sample checks guard against selection bias. \emph{Block bootstrap.} Resample the daily return series in contiguous blocks of length $20$ (circular indices), $500$ times, to obtain confidence intervals on the best in-sample strategy's final multiple and Sharpe, and a White reality-check $p$-value from the centered excess-over-buy\&hold returns,
+\[
+    p = \Pr\nolimits_{\text{boot}}\!\big[\, \overline{\rho^{\text{boot}}-\rho^{BH}} \ \ge\ \overline{\rho-\rho^{BH}} \,\big].
+\]
+\emph{Walk-forward.} Split the history into expanding-train / fixed $180$-day test blocks (minimum $730$ training days); in each block select the signal with the best \emph{training} final multiple, apply it out-of-sample, and concatenate the test-period returns to report an aggregate multiple, Sharpe, and drawdown together with the sequence of selected signals.
+
+\section{Reference Python Implementation}\label{app:code}
+
+The listings below are transcribed verbatim from \texttt{scripts/generate\_daily\_regime\_chapter.py} at report-build time (via \texttt{inspect.getsource}), so the code shown here is exactly the code that produced the numbers in this report. They implement the definitions of Appendix~\ref{app:math}: the shared regression core, the eight detectors, the causal alert rule, the long/flat backtest and metrics, the Monte Carlo calibration, and the validation checks. Standard scientific-Python imports (\texttt{numpy} as \texttt{np}, \texttt{pandas} as \texttt{pd}, \texttt{math}) are assumed.
+
+\subsection{Shared regression core}
+\subsubsection*{\texttt{\_ols\_beta\_tstat\_intercept\_from\_sums}}
+\begin{lstlisting}[language=Python]
+def _ols_beta_tstat_intercept_from_sums(
+    m: np.ndarray,
+    sx: np.ndarray,
+    sy: np.ndarray,
+    sxx: np.ndarray,
+    sxy: np.ndarray,
+    syy: np.ndarray,
+) -> np.ndarray:
+    m = m.astype(float)
+    sxx_c = sxx - sx * sx / m
+    sxy_c = sxy - sx * sy / m
+    syy_c = syy - sy * sy / m
+    beta = np.divide(sxy_c, sxx_c, out=np.full_like(sxy_c, np.nan), where=sxx_c > 1e-14)
+    sse = syy_c - beta * sxy_c
+    df = m - 2
+    sigma2 = np.divide(sse, df, out=np.full_like(sse, np.nan), where=df > 0)
+    se = np.sqrt(np.divide(sigma2, sxx_c, out=np.full_like(sigma2, np.nan), where=sxx_c > 1e-14))
+    return np.divide(beta, se, out=np.full_like(beta, np.nan), where=se > 0)
+\end{lstlisting}
+\subsection{Indicator statistics}
+\subsubsection*{\texttt{adf\_family}}
+\begin{lstlisting}[language=Python]
+def adf_family(logp: np.ndarray, tau: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    n = len(logp)
+    x = logp[:-1]
+    dy = np.diff(logp)
+    px = np.r_[0.0, np.cumsum(x)]
+    py = np.r_[0.0, np.cumsum(dy)]
+    pxx = np.r_[0.0, np.cumsum(x * x)]
+    pxy = np.r_[0.0, np.cumsum(x * dy)]
+    pyy = np.r_[0.0, np.cumsum(dy * dy)]
+
+    sadf = np.full(n, np.nan)
+    qadf = np.full(n, np.nan)
+    cadf = np.full(n, np.nan)
+    for end in range(tau, n):
+        starts = np.arange(0, end - tau + 1)
+        m = end - starts
+        tstats = _ols_beta_tstat_intercept_from_sums(
+            m=m,
+            sx=px[end] - px[starts],
+            sy=py[end] - py[starts],
+            sxx=pxx[end] - pxx[starts],
+            sxy=pxy[end] - pxy[starts],
+            syy=pyy[end] - pyy[starts],
+        )
+        tstats = tstats[np.isfinite(tstats)]
+        if len(tstats) == 0:
+            continue
+        q = float(np.quantile(tstats, 0.95))
+        sadf[end] = float(np.max(tstats))
+        qadf[end] = q
+        cadf[end] = float(np.mean(tstats[tstats >= q]))
+    return sadf, qadf, cadf
+\end{lstlisting}
+\subsubsection*{\texttt{csw\_excess}}
+\begin{lstlisting}[language=Python]
+def csw_excess(logp: np.ndarray) -> np.ndarray:
+    n = len(logp)
+    out = np.full(n, np.nan)
+    diff2 = np.diff(logp) ** 2
+    prefix = np.r_[0.0, np.cumsum(diff2)]
+    for end in range(2, n):
+        sigma = math.sqrt(prefix[end] / end) if prefix[end] > 0 else np.nan
+        if not np.isfinite(sigma) or sigma <= 0:
+            continue
+        starts = np.arange(0, end)
+        gaps = end - starts
+        stat = (logp[end] - logp[starts]) / (sigma * np.sqrt(gaps))
+        crit = np.sqrt(4.6 + np.log(gaps))
+        out[end] = float(np.nanmax(np.abs(stat) - crit))
+    return out
+\end{lstlisting}
+\subsubsection*{\texttt{recursive\_cusum}}
+\begin{lstlisting}[language=Python]
+def recursive_cusum(logp: np.ndarray) -> np.ndarray:
+    """BDE-inspired recursive forecast-error CUSUM with online normalization."""
+
+    n = len(logp)
+    resid = np.full(n, np.nan)
+    times = np.arange(n, dtype=float)
+    for end in range(8, n):
+        y = logp[:end]
+        x = times[:end]
+        x_mean = x.mean()
+        y_mean = y.mean()
+        sxx = np.sum((x - x_mean) ** 2)
+        if sxx <= 0:
+            continue
+        beta = np.sum((x - x_mean) * (y - y_mean)) / sxx
+        alpha = y_mean - beta * x_mean
+        fitted = alpha + beta * x
+        sse = np.sum((y - fitted) ** 2)
+        sigma = math.sqrt(sse / max(1, end - 2))
+        if sigma <= 0:
+            continue
+        x0 = times[end]
+        h = 1.0 / end + (x0 - x_mean) ** 2 / sxx
+        resid[end] = (logp[end] - (alpha + beta * x0)) / (sigma * math.sqrt(1 + h))
+
+    s = pd.Series(resid)
+    mu = s.expanding(min_periods=30).mean().shift(1)
+    sd = s.expanding(min_periods=30).std(ddof=0).shift(1).replace(0, np.nan)
+    z = (s - mu) / sd
+    count = z.notna().cumsum()
+    csum = z.cumsum()
+    out = csum / np.sqrt(count.replace(0, np.nan))
+    return out.to_numpy(dtype=float)
+\end{lstlisting}
+\subsubsection*{\texttt{smt\_trend\_score}}
+\begin{lstlisting}[language=Python]
+def smt_trend_score(logp: np.ndarray, price_norm: np.ndarray, tau: int, phi: float = 0.5) -> np.ndarray:
+    """SMT-style score from the AFML 17.4.3 trend battery.
+
+    Covers all four book specifications: SM-Poly1 (quadratic trend on raw
+    normalized price), SM-Poly2 (quadratic trend on log price), SM-Exp
+    (linear trend on log price), and SM-Power (log price on log time). Each
+    absolute trend t-statistic is penalized by window length to the power
+    ``phi`` before taking the supremum over backward windows.
+    """
+
+    n = len(logp)
+    t = np.arange(1, n + 1, dtype=float)
+    logt = np.log(t)
+    ones = _prefix(np.ones(n))
+    pt = _prefix(t)
+    pt2 = _prefix(t**2)
+    pt3 = _prefix(t**3)
+    pt4 = _prefix(t**4)
+    pu = _prefix(logt)
+    pu2 = _prefix(logt**2)
+
+    py_log = _prefix(logp)
+    pyy_log = _prefix(logp * logp)
+    pty_log = _prefix(t * logp)
+    pt2y_log = _prefix((t**2) * logp)
+    puy_log = _prefix(logt * logp)
+    py_pr = _prefix(price_norm)
+    pyy_pr = _prefix(price_norm * price_norm)
+    pty_pr = _prefix(t * price_norm)
+    pt2y_pr = _prefix((t**2) * price_norm)
+
+    def linear_tstat(
+        end: int,
+        starts: np.ndarray,
+        px: np.ndarray,
+        pxx: np.ndarray,
+        pxy: np.ndarray,
+        py: np.ndarray,
+        pyy: np.ndarray,
+    ) -> np.ndarray:
+        stop = end + 1
+        m = ones[stop] - ones[starts]
+        return _ols_beta_tstat_intercept_from_sums(
+            m,
+            px[stop] - px[starts],
+            py[stop] - py[starts],
+            pxx[stop] - pxx[starts],
+            pxy[stop] - pxy[starts],
+            pyy[stop] - pyy[starts],
+        )
+
+    def quadratic_tstat(
+        end: int,
+        starts: np.ndarray,
+        py: np.ndarray,
+        pty: np.ndarray,
+        pt2y: np.ndarray,
+        pyy: np.ndarray,
+    ) -> np.ndarray:
+        stop = end + 1
+        m = ones[stop] - ones[starts]
+        mats = np.empty((len(starts), 3, 3), dtype=float)
+        mats[:, 0, 0] = m
+        mats[:, 0, 1] = mats[:, 1, 0] = pt[stop] - pt[starts]
+        mats[:, 0, 2] = mats[:, 1, 1] = mats[:, 2, 0] = pt2[stop] - pt2[starts]
+        mats[:, 1, 2] = mats[:, 2, 1] = pt3[stop] - pt3[starts]
+        mats[:, 2, 2] = pt4[stop] - pt4[starts]
+        vecs = np.column_stack(
+            [
+                py[stop] - py[starts],
+                pty[stop] - pty[starts],
+                pt2y[stop] - pt2y[starts],
+            ]
+        )
+        out = np.full(len(starts), np.nan)
+        good = m > 3
+        if not np.any(good):
+            return out
+        try:
+            betas = np.linalg.solve(mats[good], vecs[good][..., None]).squeeze(-1)
+            fitted_cross = np.sum(betas * vecs[good], axis=1)
+            syy = pyy[stop] - pyy[starts[good]]
+            sse = syy - fitted_cross
+            sigma2 = sse / (m[good] - 3)
+            inv = np.linalg.inv(mats[good])
+            var = sigma2 * inv[:, 2, 2]
+            out[good] = np.abs(betas[:, 2]) / np.sqrt(var)
+        except np.linalg.LinAlgError:
+            return out
+        return out
+
+    score = np.full(n, np.nan)
+    for end in range(tau, n):
+        starts = np.arange(0, end - tau + 1)
+        m = end - starts + 1
+        penalty = m.astype(float) ** phi
+        exp_stat = np.abs(linear_tstat(end, starts, pt, pt2, pty_log, py_log, pyy_log)) / penalty
+        power_stat = np.abs(linear_tstat(end, starts, pu, pu2, puy_log, py_log, pyy_log)) / penalty
+        poly_log = quadratic_tstat(end, starts, py_log, pty_log, pt2y_log, pyy_log) / penalty
+        poly_price = quadratic_tstat(end, starts, py_pr, pty_pr, pt2y_pr, pyy_pr) / penalty
+        vals = np.concatenate([exp_stat, power_stat, poly_log, poly_price])
+        vals = vals[np.isfinite(vals)]
+        if len(vals):
+            score[end] = float(np.max(vals))
+    return score
+\end{lstlisting}
+\subsubsection*{\texttt{sdfc}}
+\begin{lstlisting}[language=Python]
+def sdfc(logp: np.ndarray, tau: int) -> tuple[float, int | None]:
+    n = len(logp)
+    if n < 2 * tau + 5:
+        return np.nan, None
+    dy = np.diff(logp)
+    lag = logp[:-1]
+    best_t = -np.inf
+    best_break = None
+    obs_index = np.arange(1, n)
+    for brk in range(tau, n - tau):
+        z = lag * (obs_index >= brk)
+        denom = float(np.dot(z, z))
+        if denom <= 0:
+            continue
+        beta = float(np.dot(z, dy) / denom)
+        err = dy - beta * z
+        sigma2 = float(np.dot(err, err) / max(1, len(dy) - 1))
+        se = math.sqrt(sigma2 / denom) if sigma2 > 0 else np.nan
+        if se > 0:
+            tstat = beta / se
+            if tstat > best_t:
+                best_t = float(tstat)
+                best_break = brk
+    if best_break is None:
+        return np.nan, None
+    return best_t, best_break
+\end{lstlisting}
+\subsection{Hidden Markov regime filter}
+\subsubsection*{\texttt{\_gaussian\_diag\_loglik}}
+\begin{lstlisting}[language=Python]
+def _gaussian_diag_loglik(x: np.ndarray, means: np.ndarray, variances: np.ndarray) -> np.ndarray:
+    """Log density of each row of ``x`` under each diagonal-Gaussian state."""
+
+    diff = x[:, None, :] - means[None, :, :]
+    quad = np.sum(diff * diff / variances[None, :, :], axis=2)
+    norm = np.sum(np.log(2.0 * np.pi * variances), axis=1)
+    return -0.5 * (quad + norm[None, :])
+\end{lstlisting}
+\subsubsection*{\texttt{\_hmm\_forward\_filter}}
+\begin{lstlisting}[language=Python]
+def _hmm_forward_filter(
+    x: np.ndarray,
+    start: np.ndarray,
+    trans: np.ndarray,
+    means: np.ndarray,
+    variances: np.ndarray,
+) -> tuple[np.ndarray, float]:
+    """Scaled forward pass. Row t of the output uses observations 0..t only.
+
+    Returns the filtered state probabilities and the total log-likelihood.
+    """
+
+    log_b = _gaussian_diag_loglik(x, means, variances)
+    row_max = log_b.max(axis=1)
+    b = np.exp(log_b - row_max[:, None])
+    n, k = b.shape
+    alpha = np.empty((n, k))
+    scale = np.empty(n)
+    a = start * b[0]
+    scale[0] = max(a.sum(), 1e-300)
+    alpha[0] = a / scale[0]
+    for t in range(1, n):
+        a = (alpha[t - 1] @ trans) * b[t]
+        scale[t] = max(a.sum(), 1e-300)
+        alpha[t] = a / scale[t]
+    loglik = float(np.sum(np.log(scale)) + np.sum(row_max))
+    return alpha, loglik
+\end{lstlisting}
+\subsubsection*{\texttt{fit\_gaussian\_hmm}}
+\begin{lstlisting}[language=Python]
+def fit_gaussian_hmm(
+    x: np.ndarray,
+    n_states: int,
+    *,
+    n_iter: int = DEFAULT_HMM_EM_ITER,
+    tol: float = 1e-6,
+) -> dict | None:
+    """Deterministic EM fit of a diagonal-covariance Gaussian HMM.
+
+    Initialization is deterministic (states seeded from quantile slices of the
+    first feature), so repeated fits on identical data give identical models.
+    Returns ``None`` when the sample is too short or the fit degenerates.
+    """
+
+    x = np.asarray(x, dtype=float)
+    n, d = x.shape
+    if n < max(8 * n_states, 2 * d + 2) or not np.isfinite(x).all():
+        return None
+    var_floor = np.maximum(np.var(x, axis=0), 1e-12) * 1e-4 + 1e-12
+
+    order = np.argsort(x[:, 0], kind="mergesort")
+    means = np.empty((n_states, d))
+    variances = np.empty((n_states, d))
+    for state, chunk in enumerate(np.array_split(order, n_states)):
+        means[state] = x[chunk].mean(axis=0)
+        variances[state] = np.maximum(x[chunk].var(axis=0), var_floor)
+    start = np.full(n_states, 1.0 / n_states)
+    if n_states > 1:
+        trans = np.full((n_states, n_states), 0.1 / (n_states - 1))
+        np.fill_diagonal(trans, 0.9)
+    else:
+        trans = np.ones((1, 1))
+
+    prev_loglik = -np.inf
+    for _ in range(n_iter):
+        log_b = _gaussian_diag_loglik(x, means, variances)
+        row_max = log_b.max(axis=1)
+        b = np.exp(log_b - row_max[:, None])
+
+        alpha = np.empty((n, n_states))
+        scale = np.empty(n)
+        a = start * b[0]
+        scale[0] = max(a.sum(), 1e-300)
+        alpha[0] = a / scale[0]
+        for t in range(1, n):
+            a = (alpha[t - 1] @ trans) * b[t]
+            scale[t] = max(a.sum(), 1e-300)
+            alpha[t] = a / scale[t]
+
+        beta = np.empty((n, n_states))
+        beta[-1] = 1.0
+        for t in range(n - 2, -1, -1):
+            beta[t] = (trans @ (b[t + 1] * beta[t + 1])) / scale[t + 1]
+
+        gamma = alpha * beta
+        gamma /= np.maximum(gamma.sum(axis=1, keepdims=True), 1e-300)
+        xi_sum = trans * (alpha[:-1].T @ ((b[1:] * beta[1:]) / scale[1:, None]))
+        loglik = float(np.sum(np.log(scale)) + np.sum(row_max))
+
+        start = np.maximum(gamma[0], 1e-12)
+        start /= start.sum()
+        trans = np.maximum(xi_sum, 1e-12)
+        trans /= trans.sum(axis=1, keepdims=True)
+        weights = np.maximum(gamma.sum(axis=0), 1e-8)
+        means = (gamma.T @ x) / weights[:, None]
+        variances = np.maximum((gamma.T @ (x * x)) / weights[:, None] - means**2, var_floor)
+
+        if not np.isfinite(loglik):
+            return None
+        if abs(loglik - prev_loglik) < tol * max(1.0, abs(prev_loglik)):
+            prev_loglik = loglik
+            break
+        prev_loglik = loglik
+
+    # Final E-step responsibilities under the converged parameters.
+    log_b = _gaussian_diag_loglik(x, means, variances)
+    row_max = log_b.max(axis=1)
+    b = np.exp(log_b - row_max[:, None])
+    alpha = np.empty((n, n_states))
+    scale = np.empty(n)
+    a = start * b[0]
+    scale[0] = max(a.sum(), 1e-300)
+    alpha[0] = a / scale[0]
+    for t in range(1, n):
+        a = (alpha[t - 1] @ trans) * b[t]
+        scale[t] = max(a.sum(), 1e-300)
+        alpha[t] = a / scale[t]
+    beta = np.empty((n, n_states))
+    beta[-1] = 1.0
+    for t in range(n - 2, -1, -1):
+        beta[t] = (trans @ (b[t + 1] * beta[t + 1])) / scale[t + 1]
+    gamma = alpha * beta
+    gamma /= np.maximum(gamma.sum(axis=1, keepdims=True), 1e-300)
+
+    return {
+        "start": start,
+        "trans": trans,
+        "means": means,
+        "variances": variances,
+        "gamma": gamma,
+        "loglik": prev_loglik,
+    }
+\end{lstlisting}
+\subsubsection*{\texttt{hmm\_regime\_signal}}
+\begin{lstlisting}[language=Python]
+def hmm_regime_signal(
+    logp: np.ndarray,
+    *,
+    n_states: int = DEFAULT_HMM_STATES,
+    refit_days: int = DEFAULT_HMM_REFIT_DAYS,
+    min_history: int = DEFAULT_HMM_MIN_HISTORY,
+    momentum_days: int = DEFAULT_MOMENTUM_DAYS,
+    n_iter: int = DEFAULT_HMM_EM_ITER,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Walk-forward Gaussian HMM regime filter with no forward-looking bias.
+
+    Design guarantees against lookahead:
+
+    - Features at close ``t`` (daily log return and ``momentum_days`` log
+      momentum) use prices through ``t`` only.
+    - Model parameters used for close ``t`` are fitted on features strictly
+      before the most recent refit date, which is itself ``<= t``.
+    - The regime at close ``t`` is the argmax of *filtered* probabilities
+      from a forward pass over features ``0..t`` (never smoothed with future
+      observations).
+    - The regime-to-signal map (which state is bullish) is computed from the
+      training window only, using EM responsibilities against same-window
+      returns.
+    - Refit dates are fixed absolute indices, so the value at ``t`` does not
+      change when future data is appended.
+
+    Returns a boolean bull-signal array and an integer state array (``-1``
+    where no model is available), both aligned to ``logp``.
+    """
+
+    n = len(logp)
+    signal = np.zeros(n, dtype=bool)
+    states = np.full(n, -1, dtype=int)
+    if n <= momentum_days + 1:
+        return signal, states
+
+    t_idx = np.arange(momentum_days, n)
+    features = np.column_stack(
+        [
+            logp[t_idx] - logp[t_idx - 1],
+            logp[t_idx] - logp[t_idx - momentum_days],
+        ]
+    )
+    n_feat = len(features)
+    if n_feat <= min_history:
+        return signal, states
+
+    model: dict | None = None
+    bull_state: int | None = None
+    fit_at = min_history
+    while fit_at < n_feat:
+        block_end = min(fit_at + refit_days, n_feat)
+        fitted = fit_gaussian_hmm(features[:fit_at], n_states, n_iter=n_iter)
+        if fitted is not None:
+            model = fitted
+            gamma = fitted["gamma"]
+            weights = np.maximum(gamma.sum(axis=0), 1e-8)
+            state_mean_return = (gamma * features[:fit_at, [0]]).sum(axis=0) / weights
+            best = int(np.argmax(state_mean_return))
+            bull_state = best if state_mean_return[best] > 0 else None
+        if model is not None:
+            filtered, _ = _hmm_forward_filter(
+                features[:block_end],
+                model["start"],
+                model["trans"],
+                model["means"],
+                model["variances"],
+            )
+            block_states = np.argmax(filtered[fit_at:block_end], axis=1)
+            states[t_idx[fit_at:block_end]] = block_states
+            if bull_state is not None:
+                signal[t_idx[fit_at:block_end]] = block_states == bull_state
+        fit_at = block_end
+    return signal, states
+\end{lstlisting}
+\subsection{Alert rule and signal pipeline}
+\subsubsection*{\texttt{online\_high\_signal}}
+\begin{lstlisting}[language=Python]
+def online_high_signal(
+    values: np.ndarray,
+    *,
+    use_abs: bool = False,
+    q: float = DEFAULT_SIGNAL_Q,
+    min_history: int = DEFAULT_SIGNAL_MIN_HISTORY,
+) -> pd.Series:
+    series = pd.Series(values).replace([np.inf, -np.inf], np.nan)
+    target = series.abs() if use_abs else series
+    threshold = target.expanding(min_periods=min_history).quantile(q).shift(1)
+    return (target > threshold).fillna(False)
+\end{lstlisting}
+\subsubsection*{\texttt{compute\_strategy\_suite}}
+\begin{lstlisting}[language=Python]
+def compute_strategy_suite(
+    asset: str,
+    dates: pd.Series,
+    close_array: np.ndarray,
+    logp: np.ndarray,
+    bde: np.ndarray,
+    csw: np.ndarray,
+    sadf: np.ndarray,
+    qadf: np.ndarray,
+    cadf: np.ndarray,
+    smt: np.ndarray,
+    hmm_bull: np.ndarray,
+    config: RunConfig,
+    *,
+    write_csv: bool = True,
+    include_validation: bool = True,
+) -> tuple[dict, str]:
+    close = pd.Series(close_array, dtype=float)
+    momentum = pd.Series(logp).diff(config.momentum_days).gt(0).fillna(False)
+    raw_events = {
+        "BDE": online_high_signal(
+            bde, use_abs=True, q=config.signal_q, min_history=config.signal_min_history
+        )
+        & momentum,
+        "CSW": pd.Series(csw).gt(0).fillna(False) & momentum,
+        "SADF": online_high_signal(sadf, q=config.signal_q, min_history=config.signal_min_history) & momentum,
+        "QADF": online_high_signal(qadf, q=config.signal_q, min_history=config.signal_min_history) & momentum,
+        "CADF": online_high_signal(cadf, q=config.signal_q, min_history=config.signal_min_history) & momentum,
+        "SMT": online_high_signal(smt, q=config.signal_q, min_history=config.signal_min_history) & momentum,
+    }
+    consensus_event = (
+        raw_events["BDE"].astype(int)
+        + raw_events["CSW"].astype(int)
+        + raw_events["SADF"].astype(int)
+        + raw_events["SMT"].astype(int)
+    ) >= 2
+    raw_events["Consensus"] = consensus_event
+
+    strategy_frame = pd.DataFrame(
+        {
+            "date": dates.dt.strftime("%Y-%m-%d"),
+            "close": close,
+            "return": close.pct_change().fillna(0.0),
+            "momentum_20d_positive": momentum,
+        }
+    )
+    metrics: dict[str, dict] = {}
+
+    buyhold_position = pd.Series(1.0, index=close.index)
+    buyhold_returns, buyhold_equity, buyhold_metrics = backtest_position(
+        dates, close, buyhold_position, transaction_cost=config.transaction_cost, charge_costs=True
+    )
+    strategy_frame["pos_BuyHold"] = buyhold_position
+    strategy_frame["ret_BuyHold"] = buyhold_returns
+    strategy_frame["equity_BuyHold"] = buyhold_equity
+    metrics["BuyHold"] = buyhold_metrics
+
+    for name, event in raw_events.items():
+        held = event.rolling(config.hold_days, min_periods=1).max().astype(bool)
+        position = held.shift(1).fillna(False).astype(float)
+        strategy_returns, equity, stats = backtest_position(
+            dates, close, position, transaction_cost=config.transaction_cost
+        )
+        strategy_frame[f"event_{name}"] = event.astype(int)
+        strategy_frame[f"pos_{name}"] = position
+        strategy_frame[f"ret_{name}"] = strategy_returns
+        strategy_frame[f"equity_{name}"] = equity
+        metrics[name] = stats
+
+    # HMM is a persistent regime state, not an alert event: hold the position
+    # exactly while the filtered bull state is active, with the same one-day
+    # execution shift as the alert strategies. No hold window or momentum gate.
+    hmm_event = pd.Series(np.asarray(hmm_bull, dtype=bool), index=close.index)
+    hmm_position = hmm_event.shift(1).fillna(False).astype(float)
+    hmm_returns, hmm_equity, hmm_stats = backtest_position(
+        dates, close, hmm_position, transaction_cost=config.transaction_cost
+    )
+    strategy_frame["event_HMM"] = hmm_event.astype(int)
+    strategy_frame["pos_HMM"] = hmm_position
+    strategy_frame["ret_HMM"] = hmm_returns
+    strategy_frame["equity_HMM"] = hmm_equity
+    metrics["HMM"] = hmm_stats
+
+    best_signal = max(STRUCTURE_STRATEGIES, key=lambda name: metrics[name]["final_multiple"])
+    best_including_buyhold = max(STRATEGY_NAMES, key=lambda name: metrics[name]["final_multiple"])
+    out_csv = DATA_DIR / f"{asset}_strategy_daily.csv"
+    if write_csv:
+        strategy_frame.to_csv(out_csv, index=False)
+
+    summary = {
+        "strategy_file": str(out_csv.relative_to(ROOT)) if write_csv else "",
+        "parameters": {
+            "transaction_cost": config.transaction_cost,
+            "signal_quantile": config.signal_q,
+            "signal_min_history": config.signal_min_history,
+            "momentum_days": config.momentum_days,
+            "hold_days": config.hold_days,
+            "hmm_states": config.hmm_states,
+            "hmm_refit_days": config.hmm_refit_days,
+            "hmm_min_history": config.hmm_min_history,
+            "buyhold_entry_cost_charged": True,
+        },
+        "metrics": metrics,
+        "best_signal_strategy": best_signal,
+        "best_signal_final_multiple": metrics[best_signal]["final_multiple"],
+        "best_including_buyhold": best_including_buyhold,
+        "best_including_buyhold_final_multiple": metrics[best_including_buyhold]["final_multiple"],
+    }
+    if include_validation:
+        summary["walk_forward"] = walk_forward_evaluation(strategy_frame, dates, config)
+        summary["multiple_testing"] = bootstrap_multiple_testing(strategy_frame, config)
+    return summary, str(out_csv.relative_to(ROOT)) if write_csv else ""
+\end{lstlisting}
+\subsection{Finite-sample Monte Carlo calibration}
+\subsubsection*{\texttt{\_simulate\_adf\_worker}}
+\begin{lstlisting}[language=Python]
+def _simulate_adf_worker(args: tuple[int, int, int, int]) -> dict[str, list[float]]:
+    n, tau, sims, seed = args
+    rng = np.random.default_rng(seed)
+    out = {"sadf": [], "qadf": [], "cadf": []}
+    for _ in range(sims):
+        y = np.cumsum(rng.normal(size=n))
+        sadf, qadf, cadf = adf_family(y, tau)
+        out["sadf"].append(finite_nanmax(sadf))
+        out["qadf"].append(finite_nanmax(qadf))
+        out["cadf"].append(finite_nanmax(cadf))
+    return out
+\end{lstlisting}
+\subsubsection*{\texttt{simulate\_adf\_critical\_values}}
+\begin{lstlisting}[language=Python]
+def simulate_adf_critical_values(n: int, tau: int, config: RunConfig) -> dict:
+    sims = int(config.calibration_sims)
+    seed = int(config.calibration_seed)
+    if sims <= 0:
+        return {
+            "version": CALIBRATION_VERSION,
+            "n": n,
+            "tau": tau,
+            "sims": 0,
+            "seed": seed,
+            "critical_values": {},
+        }
+
+    CALIBRATION_DIR.mkdir(parents=True, exist_ok=True)
+    path = calibration_cache_path(n, tau, sims, seed)
+    if path.exists():
+        return json.loads(path.read_text())
+
+    workers = max(1, min(config.workers, sims))
+    counts = [sims // workers] * workers
+    for i in range(sims % workers):
+        counts[i] += 1
+    tasks = [(n, tau, count, seed + 1009 * (i + 1)) for i, count in enumerate(counts) if count > 0]
+    if workers == 1:
+        parts = [_simulate_adf_worker(task) for task in tasks]
+    else:
+        with Pool(processes=workers) as pool:
+            parts = pool.map(_simulate_adf_worker, tasks)
+
+    combined = {"sadf": [], "qadf": [], "cadf": []}
+    for part in parts:
+        for key in combined:
+            combined[key].extend(part[key])
+
+    critical_values = {}
+    for key, values in combined.items():
+        arr = np.asarray(values, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        critical_values[f"{key}_90"] = float(np.quantile(arr, 0.90)) if len(arr) else np.nan
+        critical_values[f"{key}_95"] = float(np.quantile(arr, 0.95)) if len(arr) else np.nan
+        critical_values[f"{key}_99"] = float(np.quantile(arr, 0.99)) if len(arr) else np.nan
+
+    payload = {
+        "version": CALIBRATION_VERSION,
+        "n": n,
+        "tau": tau,
+        "sims": sims,
+        "seed": seed,
+        "critical_values": critical_values,
+    }
+    path.write_text(json.dumps(strict_json_value(payload), indent=2, allow_nan=False))
+    return payload
+\end{lstlisting}
+\subsection{Long/flat backtest and metrics}
+\subsubsection*{\texttt{max\_drawdown}}
+\begin{lstlisting}[language=Python]
+def max_drawdown(equity: pd.Series) -> float:
+    running_max = equity.cummax()
+    drawdown = equity / running_max - 1.0
+    return float(drawdown.min())
+\end{lstlisting}
+\subsubsection*{\texttt{metrics\_from\_returns}}
+\begin{lstlisting}[language=Python]
+def metrics_from_returns(
+    strategy_returns: pd.Series,
+    *,
+    days: int | None = None,
+    position: pd.Series | None = None,
+) -> tuple[pd.Series, dict]:
+    strategy_returns = strategy_returns.astype(float).fillna(0.0)
+    equity = (1.0 + strategy_returns).cumprod()
+    days = int(days if days is not None else max(1, len(strategy_returns) - 1))
+    years = max(days / 365.25, 1 / 365.25)
+    daily_std = float(strategy_returns.std(ddof=0))
+    sharpe = float(np.sqrt(365.0) * strategy_returns.mean() / daily_std) if daily_std > 0 else np.nan
+    metrics = {
+        "final_multiple": float(equity.iloc[-1]) if len(equity) else np.nan,
+        "total_return": float(equity.iloc[-1] - 1.0) if len(equity) else np.nan,
+        "cagr": float(equity.iloc[-1] ** (1.0 / years) - 1.0)
+        if len(equity) and years > 0 and equity.iloc[-1] > 0
+        else np.nan,
+        "max_drawdown": max_drawdown(equity) if len(equity) else np.nan,
+        "sharpe": sharpe,
+        "exposure": float(position.mean()) if position is not None else np.nan,
+        "trades": int(((position > 0) & (position.shift(1).fillna(0) <= 0)).sum()) if position is not None else 0,
+        "turnover": float(position.diff().abs().fillna(position.abs()).sum()) if position is not None else np.nan,
+    }
+    return equity, metrics
+\end{lstlisting}
+\subsubsection*{\texttt{backtest\_position}}
+\begin{lstlisting}[language=Python]
+def backtest_position(
+    dates: pd.Series,
+    close: pd.Series,
+    position: pd.Series,
+    *,
+    transaction_cost: float = DEFAULT_TRANSACTION_COST,
+    charge_costs: bool = True,
+) -> tuple[pd.Series, pd.Series, dict]:
+    returns = close.pct_change().fillna(0.0)
+    position = position.astype(float).fillna(0.0)
+    turnover = position.diff().abs().fillna(position.abs())
+    costs = transaction_cost * turnover if charge_costs else 0.0
+    strategy_returns = position * returns - costs
+    days = max(1, int((pd.Timestamp(dates.iloc[-1]) - pd.Timestamp(dates.iloc[0])).days))
+    equity, metrics = metrics_from_returns(strategy_returns, days=days, position=position)
+    return strategy_returns, equity, metrics
+\end{lstlisting}
+\subsection{Validation: block bootstrap and walk-forward}
+\subsubsection*{\texttt{block\_bootstrap\_indices}}
+\begin{lstlisting}[language=Python]
+def block_bootstrap_indices(n: int, block_size: int, rng: np.random.Generator) -> np.ndarray:
+    if n <= 0:
+        return np.array([], dtype=int)
+    starts = rng.integers(0, n, size=int(math.ceil(n / block_size)))
+    pieces = [(start + np.arange(block_size)) % n for start in starts]
+    return np.concatenate(pieces)[:n]
+\end{lstlisting}
+\subsubsection*{\texttt{bootstrap\_multiple\_testing}}
+\begin{lstlisting}[language=Python]
+def bootstrap_multiple_testing(strategy_frame: pd.DataFrame, config: RunConfig) -> dict:
+    sims = config.bootstrap_sims
+    if sims <= 0:
+        return {"sims": 0, "note": "bootstrap disabled"}
+    n = len(strategy_frame)
+    rng = np.random.default_rng(config.bootstrap_seed + n)
+    buyhold = strategy_frame["ret_BuyHold"].to_numpy(dtype=float)
+    structure_returns = {
+        name: strategy_frame[f"ret_{name}"].to_numpy(dtype=float) for name in STRUCTURE_STRATEGIES
+    }
+    final_multiples = {
+        name: float(np.prod(1.0 + values)) for name, values in structure_returns.items()
+    }
+    best_signal = max(final_multiples, key=final_multiples.get)
+    best_returns = structure_returns[best_signal]
+    excess = np.column_stack([structure_returns[name] - buyhold for name in STRUCTURE_STRATEGIES])
+    observed_best_mean_excess = float(np.nanmax(excess.mean(axis=0)))
+    centered_excess = excess - excess.mean(axis=0)
+
+    boot_final = []
+    boot_sharpe = []
+    boot_reality = []
+    for _ in range(sims):
+        idx = block_bootstrap_indices(n, max(2, config.hold_days), rng)
+        sampled = best_returns[idx]
+        boot_final.append(float(np.prod(1.0 + sampled)))
+        std = float(np.std(sampled, ddof=0))
+        boot_sharpe.append(float(np.sqrt(365.0) * np.mean(sampled) / std) if std > 0 else np.nan)
+        boot_reality.append(float(np.nanmax(centered_excess[idx].mean(axis=0))))
+
+    boot_final_arr = np.asarray(boot_final, dtype=float)
+    boot_sharpe_arr = np.asarray(boot_sharpe, dtype=float)
+    boot_reality_arr = np.asarray(boot_reality, dtype=float)
+    return {
+        "sims": int(sims),
+        "block_size": int(max(2, config.hold_days)),
+        "best_signal": best_signal,
+        "best_signal_final_multiple": final_multiples[best_signal],
+        "best_signal_final_ci_05": float(np.nanquantile(boot_final_arr, 0.05)),
+        "best_signal_final_ci_95": float(np.nanquantile(boot_final_arr, 0.95)),
+        "best_signal_sharpe_ci_05": float(np.nanquantile(boot_sharpe_arr, 0.05)),
+        "best_signal_sharpe_ci_95": float(np.nanquantile(boot_sharpe_arr, 0.95)),
+        "observed_best_daily_excess_mean": observed_best_mean_excess,
+        "reality_check_p_value": float(np.mean(boot_reality_arr >= observed_best_mean_excess)),
+    }
+\end{lstlisting}
+\subsubsection*{\texttt{walk\_forward\_evaluation}}
+\begin{lstlisting}[language=Python]
+def walk_forward_evaluation(strategy_frame: pd.DataFrame, dates: pd.Series, config: RunConfig) -> dict:
+    n = len(strategy_frame)
+    start = config.walk_forward_train_min
+    blocks = []
+    selected_returns = []
+    selected_dates = []
+
+    while start + config.walk_forward_test_size <= n:
+        train = slice(0, start)
+        test = slice(start, start + config.walk_forward_test_size)
+        train_multiples = {
+            name: float(np.prod(1.0 + strategy_frame[f"ret_{name}"].iloc[train].to_numpy(dtype=float)))
+            for name in STRUCTURE_STRATEGIES
+        }
+        selected = max(train_multiples, key=train_multiples.get)
+        test_returns = strategy_frame[f"ret_{selected}"].iloc[test].reset_index(drop=True)
+        test_days = max(
+            1,
+            int(
+                (
+                    pd.Timestamp(dates.iloc[start + config.walk_forward_test_size - 1])
+                    - pd.Timestamp(dates.iloc[start])
+                ).days
+            ),
+        )
+        _, test_metrics = metrics_from_returns(test_returns, days=test_days)
+        blocks.append(
+            {
+                "train_end": pd.Timestamp(dates.iloc[start - 1]).date().isoformat(),
+                "test_start": pd.Timestamp(dates.iloc[start]).date().isoformat(),
+                "test_end": pd.Timestamp(dates.iloc[start + config.walk_forward_test_size - 1]).date().isoformat(),
+                "selected_signal": selected,
+                "test_final_multiple": test_metrics["final_multiple"],
+                "test_sharpe": test_metrics["sharpe"],
+                "test_max_drawdown": test_metrics["max_drawdown"],
+            }
+        )
+        selected_returns.append(test_returns)
+        selected_dates.extend(dates.iloc[test].tolist())
+        start += config.walk_forward_test_size
+
+    if not selected_returns:
+        return {
+            "blocks": [],
+            "aggregate": {
+                "blocks": 0,
+                "test_days": 0,
+                "final_multiple": np.nan,
+                "sharpe": np.nan,
+                "max_drawdown": np.nan,
+                "selected_signals": "",
+            },
+        }
+
+    combined = pd.concat(selected_returns, ignore_index=True)
+    test_days = max(1, int((pd.Timestamp(selected_dates[-1]) - pd.Timestamp(selected_dates[0])).days))
+    _, aggregate = metrics_from_returns(combined, days=test_days)
+    aggregate.update(
+        {
+            "blocks": len(blocks),
+            "test_days": int(len(combined)),
+            "selected_signals": ", ".join(block["selected_signal"] for block in blocks),
+        }
+    )
+    return {"blocks": blocks, "aggregate": aggregate}
+\end{lstlisting}
 
 \end{document}

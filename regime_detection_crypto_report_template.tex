@@ -106,6 +106,8 @@ HMM regime filter & Hamilton (1989); Cartea et al.\ Ch.~12 & walk-forward, filte
 \caption{Where each diagnostic comes from and how closely it follows the source definition.}
 \end{table}
 
+Complete formal definitions of every statistic, the alert rule, the long/flat backtest, the finite-sample calibration null, and the validation checks are collected in Appendix~\ref{app:math}, and the reference Python that computes them is reproduced verbatim in Appendix~\ref{app:code}. Together they are sufficient to recompute every number in this report from the raw daily closes.
+
 \subsection{CUSUM Tests}
 
 CUSUM means cumulative sum. The BDE-inspired series in this report is a recursive one-step forecast-error CUSUM from a simple log-price trend model. At each close $t$ the trend model is refitted on all data before $t$, and the standardized forecast error
@@ -407,5 +409,179 @@ The generator writes daily diagnostics, strategy PnL CSVs, cached calibration fi
     \item Binance API daily kline endpoints for BTCUSDT, ETHUSDT, ETCUSDT, SOLUSDT spot, and HYPEUSDT USD-M futures fallback.
     \item Local reproduction script: \texttt{scripts/generate\_daily\_regime\_chapter.py}.
 \end{itemize}
+
+\appendix
+
+\section{Full Mathematical Specification}\label{app:math}
+
+This appendix gives the complete formal definition of every statistic, the alert rule, the long/flat backtest, the finite-sample calibration, and the validation checks, so that all numbers in this report can be reproduced from the raw daily closes alone. Every structural-break detector is an implementation of a method from Marcos L\'opez de Prado, \emph{Advances in Financial Machine Learning} (Wiley, 2018), Chapter~17, sections 17.3--17.4; the latent-regime filter follows the Markov-chain regime models of \'Alvaro Cartea, Sebastian Jaimungal, and Jos\'e Penalva, \emph{Algorithmic and High-Frequency Trading} (Cambridge University Press, 2015), Chapter~12, together with the Markov-switching model of Hamilton (1989). The reference Python that evaluates each expression below is reproduced verbatim in Appendix~\ref{app:code}.
+
+Throughout, $p_t$ denotes the daily close, $y_t=\log p_t$ the log price, and $r_t = p_t/p_{t-1}-1$ the simple return; $n$ is the number of observations. All detectors are \emph{causal}: the value published at date $t$ uses only information available at or before $t$. The minimum backward window is
+\[
+    \tau = \max\!\left(60,\ \left\lceil 0.15\,n \right\rceil\right).
+\]
+
+\subsection{Shared regression core}
+
+Most detectors reduce to the slope $t$-statistic of a straight-line fit on a backward window. For a window with points $\{(x_i,z_i)\}_{i=1}^{m}$ define the centered moments
+\[
+    S_{xx}=\sum_i x_i^2-\tfrac{1}{m}\Big(\sum_i x_i\Big)^2,\qquad
+    S_{xz}=\sum_i x_i z_i-\tfrac{1}{m}\sum_i x_i\sum_i z_i,\qquad
+    S_{zz}=\sum_i z_i^2-\tfrac{1}{m}\Big(\sum_i z_i\Big)^2 .
+\]
+Then the ordinary-least-squares slope, its residual variance, and its $t$-statistic are
+\[
+    \hat\beta=\frac{S_{xz}}{S_{xx}},\qquad
+    \mathrm{SSE}=S_{zz}-\hat\beta\,S_{xz},\qquad
+    \hat\sigma^2=\frac{\mathrm{SSE}}{m-2},\qquad
+    t=\frac{\hat\beta}{\sqrt{\hat\sigma^2/S_{xx}}} .
+\]
+Because $S_{xx},S_{xz},S_{zz}$ are assembled from prefix sums, every backward window ending at $t$ is evaluated in $O(1)$. The ADF-style tests use the zero-lag Dickey--Fuller regression
+\[
+    \Delta y_i = \alpha + \beta\,y_{i-1} + \varepsilon_i ,
+\]
+whose slope $t$-statistic $DF=\hat\beta/\mathrm{se}(\hat\beta)$ is the quantity above with $x_i=y_{i-1}$ and $z_i=\Delta y_i$. Under a random walk $\beta=0$; a significantly positive $\hat\beta$ is the explosive (mean-repelling) alternative.
+
+\subsection{BDE recursive CUSUM (AFML 17.3.1)}
+
+Following Brown, Durbin, and Evans (1975), fit the log-price trend $y=\hat\alpha_{t-1}+\hat\beta_{t-1}\,\mathrm{time}$ on all data strictly before $t$ and form the standardized one-step-ahead recursive residual
+\[
+    \hat\omega_t = \frac{y_t - \hat\alpha_{t-1} - \hat\beta_{t-1}\, t}{\hat\sigma_{t-1}\sqrt{1 + h_t}},
+    \qquad
+    h_t = \frac{1}{t} + \frac{(t-\bar x)^2}{S_{xx}},
+\]
+where $h_t$ is the leverage of the new time index and $\hat\sigma_{t-1}$ the in-sample residual scale. The residuals are standardized online with a shifted expanding mean and standard deviation, $z_t=(\hat\omega_t-\mu_{<t})/\sigma_{<t}$, and accumulated into a scaled CUSUM
+\[
+    W_t = \frac{1}{\sqrt{N_t}}\sum_{i\le t} z_i ,
+\]
+with $N_t$ the count of finite $z_i$ through $t$. A large $|W_t|$ marks a persistent, one-sided drift of forecast errors, i.e.\ a change in the trend regime.
+
+\subsection{Chu--Stinchcombe--White excess (AFML 17.3.2)}
+
+At each date $t$, and for every earlier reference point $n<t$, measure how far log price has travelled from its level at $n$, standardized by realized volatility:
+\[
+    S_{n,t} = \frac{y_t-y_n}{\hat\sigma_t\sqrt{t-n}},
+    \qquad
+    \hat\sigma_t^2 = \frac{1}{t}\sum_{i\le t} (\Delta y_i)^2 .
+\]
+Chu, Stinchcombe, and White (1996) monitor $S_{n,t}$ against a time-varying boundary; here the reported statistic is the supremum \emph{excess} over that boundary, applied symmetrically to bubbles and crashes,
+\[
+    \mathrm{CSW}_t = \max_{n<t}\Big(\,\lvert S_{n,t}\rvert - c_{n,t}\,\Big),
+    \qquad
+    c_{n,t} = \sqrt{\,4.6 + \ln(t-n)\,},
+\]
+where $4.6$ is the asymptotic 5\% constant of the test. Values $\mathrm{CSW}_t>0$ indicate the boundary was crossed.
+
+\subsection{ADF family: SADF, QADF, CADF (AFML 17.4.2)}
+
+Fix the endpoint $t$ and run the zero-lag ADF regression on every backward window $[s,t]$ of length at least $\tau$, producing the set of Dickey--Fuller slope $t$-statistics
+\[
+    \mathcal{D}_t = \big\{\, DF_{s,t} : 0 \le s \le t-\tau \,\big\}.
+\]
+The three summaries collapse this set in different ways:
+\[
+    \mathrm{SADF}_t = \sup_{s} DF_{s,t},
+    \qquad
+    \mathrm{QADF}_t = Q_{0.95}\!\big(\mathcal{D}_t\big),
+    \qquad
+    \mathrm{CADF}_t = \operatorname{mean}\big\{\, d \in \mathcal{D}_t : d \ge Q_{0.95}(\mathcal{D}_t) \,\big\},
+\]
+i.e.\ the supremum ADF of Phillips, Wu, and Yu (2011), the 95th percentile of the window statistics, and the conditional mean of the upper 5\% tail. All three use $\tau$ as the minimum window.
+
+\subsection{SMT trend battery (AFML 17.4.3)}
+
+For each backward window $[t_0,t]$ (length $m=t-t_0+1$) fit four trend specifications and take the penalized absolute trend $t$-statistic:
+\begin{itemize}
+    \item SM-Exp: linear regression of $y$ (log price) on time,
+    \item SM-Power: linear regression of $y$ on $\log(\mathrm{time})$,
+    \item SM-Poly2: quadratic regression of $y$ on time and time$^2$,
+    \item SM-Poly1: quadratic regression of the normalized raw price $p_t/p_0$ on time and time$^2$,
+\end{itemize}
+where the quadratic $t$-statistic is that of the leading (curvature) coefficient. The score aggregates all four forms and all windows,
+\[
+    \mathrm{SMT}_t = \sup_{t_0 \in [1,\,t-\tau]}\ \max_{f\in\{\mathrm{Exp,Power,Poly1,Poly2}\}}
+    \left\{ \frac{\big\lvert \hat\beta^{(f)}_{t_0,t}\big\rvert}{\hat\sigma_{\beta^{(f)}_{t_0,t}}\,(t-t_0)^{\varphi}} \right\},
+    \qquad \varphi = 0.5,
+\]
+the length penalty $(t-t_0)^{\varphi}$ preventing long windows from dominating through mechanically large $t$-values.
+
+\subsection{SDFC break test (AFML 17.4.1)}
+
+The supremum Dickey--Fuller--Chow statistic scans every candidate break date $t^\ast$ and tests a single switch into an explosive regime, reporting the largest break $t$-statistic over the sample. Because the break date is chosen using the full sample, it is a retrospective diagnostic and is \emph{not} converted into a traded strategy in this report.
+
+\subsection{Hidden Markov regime filter (Cartea et al.\ Ch.~12; Hamilton 1989)}
+
+A Gaussian HMM is fitted on two causal daily features, the one-day log return and the trailing $20$-day log momentum, $x_t=\big(y_t-y_{t-1},\ y_t-y_{t-20}\big)$. The market is assumed to switch between $K=3$ latent states following a Markov chain with transition matrix $A$, with state-conditional Gaussian emissions
+\[
+    x_t \mid s_t = k \sim \mathcal{N}(\mu_k, \Sigma_k),
+    \qquad
+    \Pr[s_t = k \mid x_{1:t}] \propto
+    \Big( \textstyle\sum_j \Pr[s_{t-1}=j \mid x_{1:t-1}]\, A_{jk} \Big)\, \mathcal{N}(x_t; \mu_k, \Sigma_k).
+\]
+The right-hand recursion is the \emph{filtered} state probability, conditioning only on observations up to $t$. Parameters are estimated by deterministic Baum--Welch EM: the E-step computes responsibilities $\gamma_{t}(k)=\Pr[s_t=k\mid x_{1:T}]$ and pair marginals by the forward--backward algorithm; the M-step re-estimates
+\[
+    \mu_k = \frac{\sum_t \gamma_t(k)\,x_t}{\sum_t \gamma_t(k)},
+    \qquad
+    \Sigma_k = \operatorname{diag}\!\frac{\sum_t \gamma_t(k)\,(x_t-\mu_k)^2}{\sum_t \gamma_t(k)},
+    \qquad
+    A_{jk} \propto \sum_t \xi_t(j,k),
+\]
+with a variance floor and quantile-based initialization (so no random seed is needed). The fit is refit walk-forward every $126$ days on an expanding window (minimum $365$ observations). The ``bull'' state is the one with the highest EM-weighted mean return on the training window, used only if that mean is positive; the regime at $t$ is the argmax of the filtered probabilities, and the signal is long while the state equals the bull state.
+
+\subsection{Consensus}
+
+The consensus detector fires only when at least two independent families agree on the same day:
+\[
+    \mathrm{Consensus}_t = \mathbb{1}\!\left\{\ \sum_{m\,\in\,\{\mathrm{BDE},\,\mathrm{CSW},\,\mathrm{SADF},\,\mathrm{SMT}\}} \mathrm{alert}_{m,t}\ \ge\ 2\ \right\},
+\]
+where $\mathrm{alert}_{m,t}\in\{0,1\}$ is the (momentum-gated) alert of member $m$ defined next. The QADF, CADF, and HMM signals are not part of the vote.
+
+\subsection{Alert rule and signal pipeline}
+
+Every structural-break statistic $g_t$ is turned into a binary alert by a purely causal, self-referential threshold: the alert fires when the statistic exceeds the $95$th percentile of its own strictly-prior history,
+\[
+    \mathrm{alert}_t = \mathbb{1}\!\left\{\ g_t > Q_{0.95}\big(\{g_i\}_{i<t}\big)\ \right\}\ \wedge\ \mathbb{1}\{\,y_t-y_{t-20}>0\,\},
+\]
+using an expanding window with a $60$-observation warm-up, shifted by one day so no contemporaneous information leaks. The second factor is the $20$-day momentum gate. (CSW uses its own zero boundary $\mathrm{CSW}_t>0$ in place of the quantile; the HMM uses its filtered bull-state indicator directly.) An alert opens a long position held for $H=20$ days, and the traded position is lagged one day for next-close execution:
+\[
+    \mathrm{held}_t = \max_{0\le k<H} \mathrm{alert}_{t-k},
+    \qquad
+    w_t = \mathrm{held}_{t-1}\in\{0,1\}.
+\]
+
+\subsection{Long/flat backtest and performance metrics}
+
+With position $w_t\in\{0,1\}$, turnover $u_t=\lvert w_t-w_{t-1}\rvert$, and proportional cost $c=0.001$ (0.1\% per unit turnover), the net strategy return and equity are
+\[
+    \rho_t = w_t\, r_t - c\,u_t,
+    \qquad
+    E_t = \prod_{i\le t}(1+\rho_i).
+\]
+Writing $Y=(\text{days})/365.25$ for the sample length in years, the reported metrics are
+\[
+    \text{multiple}=E_n,\quad
+    \mathrm{CAGR}=E_n^{1/Y}-1,\quad
+    \mathrm{Sharpe}=\sqrt{365}\,\frac{\bar\rho}{\mathrm{std}(\rho)},\quad
+    \mathrm{MDD}=\min_t\!\left(\frac{E_t}{\max_{i\le t}E_i}-1\right),
+\]
+together with exposure $=\overline{w}$ (mean position) and the trade count $=\#\{t: w_t>0,\ w_{t-1}\le 0\}$ (flat$\to$long transitions). Buy-and-hold uses $w_t\equiv1$ with a single entry cost.
+
+\subsection{Finite-sample Monte Carlo calibration}
+
+Asymptotic ADF critical values are unreliable in finite samples, so the ADF-family thresholds are calibrated by simulation. For the asset's own length $n$ and window $\tau$, draw $2000$ Gaussian random walks $y^{(b)}=\operatorname{cumsum}(\varepsilon)$ (the unit-root null, seed $123$), run the identical \texttt{adf\_family} routine on each, and record the sample supremum of each series. The empirical $90/95/99$th percentiles of those $2000$ maxima are the critical values, cached on disk keyed by $(n,\tau,\text{sims},\text{seed})$ and reused across runs. The count of dates whose statistic exceeds the simulated 95\% value is reported as a retrospective significance check (not a per-date p-value).
+
+\subsection{Validation: block bootstrap and walk-forward}
+
+Two out-of-sample checks guard against selection bias. \emph{Block bootstrap.} Resample the daily return series in contiguous blocks of length $20$ (circular indices), $500$ times, to obtain confidence intervals on the best in-sample strategy's final multiple and Sharpe, and a White reality-check $p$-value from the centered excess-over-buy\&hold returns,
+\[
+    p = \Pr\nolimits_{\text{boot}}\!\big[\, \overline{\rho^{\text{boot}}-\rho^{BH}} \ \ge\ \overline{\rho-\rho^{BH}} \,\big].
+\]
+\emph{Walk-forward.} Split the history into expanding-train / fixed $180$-day test blocks (minimum $730$ training days); in each block select the signal with the best \emph{training} final multiple, apply it out-of-sample, and concatenate the test-period returns to report an aggregate multiple, Sharpe, and drawdown together with the sequence of selected signals.
+
+\section{Reference Python Implementation}\label{app:code}
+
+The listings below are transcribed verbatim from \texttt{scripts/generate\_daily\_regime\_chapter.py} at report-build time (via \texttt{inspect.getsource}), so the code shown here is exactly the code that produced the numbers in this report. They implement the definitions of Appendix~\ref{app:math}: the shared regression core, the eight detectors, the causal alert rule, the long/flat backtest and metrics, the Monte Carlo calibration, and the validation checks. Standard scientific-Python imports (\texttt{numpy} as \texttt{np}, \texttt{pandas} as \texttt{pd}, \texttt{math}) are assumed.
+
+%%APPENDIX_CODE%%
 
 \end{document}
