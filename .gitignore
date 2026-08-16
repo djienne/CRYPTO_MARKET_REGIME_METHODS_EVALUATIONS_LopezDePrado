@@ -15,3 +15,10 @@ __pycache__/
 
 # YouTube video production assets: do not commit.
 youtube/
+
+# Secrets — the real .env must never be committed.
+.env
+.env.*
+
+# ...but the placeholder template must stay tracked.
+!.env.example
